@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import datetime
+import random
 
 class crawler:
     def get_html(self, url):
@@ -29,17 +30,31 @@ class crawler:
                 return i
         return 3
 
-    def get_info(self, link, command, today):
+    def get_today(self):
+        today = datetime.datetime.today()
+        index = self.get_count(today) # 아침, 점심, 저녁, 다음 날 아침중에 어떤 식사를 불러와야 하는지를 나타내는 정수
+        try:
+            today = today.replace(day = int(today.day + index / 3)) # 다음 날 아침을 불러와야 한다면 today에 다음 날로 바꾼 datetime 객체를 넣음
+        except ValueError: # 한 달의 마지막 날에서 1이 더해진다면 ValueError가 발생하므로 예외 처리
+            try:
+                today = today.replace(month = today.month + 1, day = 1) # 다음 달 1일로 바꾼 datetime 객체를 넣어준다
+            except ValueError: # 한 해의 마지막 달에서 1이 더해진다면 ValueError가 발생하므로 예외 처리
+                today = today.replace(year = today.year + 1, month = 1, day = 1) # 다음 년도 1월 1일로 바꾼 datetime 객체를 넣어준다
+
+        return today
+
+    def get_info(self, link, command):
         """
         리턴값 : string
-        command에 따라서 식단표를 출력하거나, 학사 일정을 출력한다.
+        command에 따라서 식단표를 출력하거나, 학사 일정을 출력하는 등 처리를 한다.
         """
         html = self.get_html(link)
         soup = BeautifulSoup(html, "html.parser")
         
-        return getattr(self, "%s_process" % command, "%s 작업을 처리하는데에 문제가 생겼습니다." % command)(soup, today)
+        return getattr(self, "%s_process" % command, "%s 작업을 처리하는데에 문제가 생겼습니다." % command)(soup)
 
-    def hungry_process(self, soup, today):
+    def hungry_process(self, soup):
+        today = self.get_today()
         index = self.get_count(today)
         item = ["아침", "점심", "저녁"]
         
@@ -60,7 +75,8 @@ class crawler:
             print("[Error] GSM Bot can't get a menu")
             return "%s 급식을 불러올 수 없습니다." % item[index]
 
-    def calendar_process(self, soup, today):
+    def calendar_process(self, soup):
+        today = datetime.datetime.today()
         try:
             info = soup.select("#xb_fm_list > div.calendar > ul > li > dl")
             result = "```"
@@ -76,6 +92,15 @@ class crawler:
         except AttributeError:
             print("[Error] GSM Bot can't get a calendar")
             return "%s년 %s월 학사일정을 불러올 수 없습니다." % (today.year, today.month)
-            
+
+    def image_process(self, soup):
+        try:
+            info = soup.find_all("img")
+            index = random.randint(1, len(info)) # 구글 자체 이미지가 포함되어 있기 때문에 1부터 시작한다
+            return info[index]["src"] # 이미지의 링크를 가져옴
+        except:
+            print("[Error] GSM Bot can't get a image")
+            return "이미지를 불러올 수 없습니다."
+
 if __name__ == "__main__": # WebCrawler.py를 메인으로 실행할 때만 실행됨
-    print(crawler().get_info("http://www.gsm.hs.kr/xboard/board.php?tbnum=4", "calendar", datetime.datetime(2018, 9, 17, 7, 0, 55, 731039)))
+    print(crawler().get_info("https://www.google.co.kr/search?tbm=isch&q=FUCK", "image"))
