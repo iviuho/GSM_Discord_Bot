@@ -5,6 +5,7 @@ from WebCrawler import crawler
 import json
 import os
 import operator
+import re
 
 class GSMBot(discord.Client):
     def __init__(self):
@@ -37,6 +38,9 @@ class GSMBot(discord.Client):
         self.splitCommands = []
         for i in self.allCommands:
             self.splitCommands.append(i.split("command_")[-1])
+
+        self.peekList = []
+
         super().__init__()
     
     async def on_ready(self):
@@ -68,20 +72,65 @@ class GSMBot(discord.Client):
                 return
 
     async def on_member_update(self, before, after):
-        if before.nick == after.nick: # 닉네임이 바뀐게 아니라면 리턴
+        if not before in self.peekList: # 감시 리스트에 있지 않으면 바로 리턴
             return
 
-        def f(member): # 닉네임이 따로 설정되어 있지 않은 경우에 None이 출력되는 것을 막기 위한 함수
-            if member.nick == None:
-                return member.name
-            else:
-                return member.nick
+        msg = None
+        em = None
+
+        if not before.status == after.status:
+            def temp(status):
+                if status == discord.Status.online:
+                    return "온라인"
+                elif status == discord.Status.offline:
+                    return "오프라인"
+                elif status == discord.Status.idle:
+                    return "자리비움"
+                elif status == discord.Status.do_not_disturb:
+                    return "다른 용무중"
+
+            msg = "%s님이 %s에서 %s로 상태를 바꿨습니다." % (before.name, temp(before.status), temp(after.status))
+
+        if not before.game == after.game:
+            def temp(game):
+                if game:
+                    return game.name
+                else:
+                    return "휴식"
+
+            msg = "%s님이 %s을 시작하셨습니다." % (before.name, temp(after.game))
+
+        if not before.avatar == after.avatar:
+            def temp(member):
+                if member.avatar:
+                    return member.avatar_url
+                else:
+                    return member.default_avatar_url
+
+            em = discord.Embed(title = "%s님이 프로필 사진을 바꾸셨습니다" % before.name)
+            em.set_image(temp(after))
+
+        if not before.nick == after.nick:
+            def temp(member): # 닉네임이 따로 설정되어 있지 않은 경우에 None이 출력되는 것을 막기 위한 함수
+                if member.nick:
+                    return member.nick
+                else:
+                    return member.name
+
+            msg = "%s님이 %s에서 %s로 닉네임을 변경하셨습니다." % (before, temp(before), temp(after))
 
         for i in before.server.channels: # 채널들을 받아옴
             if i.type == discord.ChannelType.text: # 그 중에 텍스트 채널인 동시에,
                 if i.permissions_for(before.server.me).send_messages == True: # 메시지 보내기 권한이 있다면 메시지 출력
-                    await self.send_message(i, "%s님이 %s에서 %s로 닉네임을 변경하셨습니다." % (before, f(before), f(after)))
-                    break # 하나의 채널에만 보내기 위해서 break를 통해 탈출
+                    await self.send_message(i, msg)
+                    return # 하나의 채널에만 보내기 위해서 return을 통해 탈출
+
+    async def on_member_remove(self, member):
+        for i in member.server.channels:
+            if i.type == discord.ChannelType.text:
+                if i.permissions_for(member.server.me).send_messages == True:
+                    await self.send_message(i, "%s님이 %s에서 탈주하셨습니다." % (member.author.name, member.server.name))
+                    return
 
     async def command_gsm(self, message):
         """
@@ -92,7 +141,7 @@ class GSMBot(discord.Client):
         with open("GSMBot.txt", "r", encoding = "UTF8") as f:
             msg = f.read() + "\n"
 
-        allCommands = ""
+        allCommands = str()
         for i in self.allCommands: # GSM Bot의 모든 요소를 불러온 후, command_로 시작하는 함수들만 리스트로 만들어서 출력
             allCommands += "***%s***\n" % (i.split("_")[-1]) # command_x에서 _를 기준으로 맨 뒤, 즉 x만 msg에 추가한다
             allCommands += "%s\n" % (getattr(self, i).__doc__).strip()
@@ -135,7 +184,7 @@ class GSMBot(discord.Client):
 
         title_ = "%s년 %s월 %s일 %s의 %s 식단표" % (today.year, today.month, today.day,
                 ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][int(today.weekday())],
-                ["아침", "점심", "저녁"][crawler().get_count(today)])
+                ["아침", "점심", "저녁"][crawler().get_count(today) % 3])
         em = discord.Embed(title = title_, description = crawler().get_info("http://www.gsm.hs.kr/xboard/board.php?tbnum=8", "hungry"), colour = self.color)
         await self.send_message(message.channel, embed = em)
 
@@ -265,7 +314,7 @@ class GSMBot(discord.Client):
                 return
 
             content = content.split()[0:-1] # 스플릿 마지막 결과(시간)을 제외한 나머지를 content에 저장
-            subject = "" 
+            subject = str() 
             for i in content: # 입력받았을 때 처럼 띄어쓰기를 넣기 위함
                 subject += (i + " ")
 
@@ -306,8 +355,10 @@ class GSMBot(discord.Client):
         결과를 사진으로 보내줍니다.
         """
 
-        await self.send_message(message.channel, "검색어를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
+        quest = await self.send_message(message.channel, "검색어를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
+
+        await self.delete_message(quest)
 
         if response == None or response.content.lower() == "cancel":
             await self.send_message(message.channel, "이미지 검색이 취소되었습니다.")
@@ -316,6 +367,7 @@ class GSMBot(discord.Client):
         await self.send_typing(message.channel)
 
         keyword = response.content
+        print("%s : image %s" % (message.author, keyword))
         image = crawler().get_info("https://www.google.co.kr/search?tbm=isch&q=%s" % keyword, "image")
         
         em = discord.Embed(title = "%s의 이미지 검색 결과" % keyword, colour = self.color)
@@ -325,6 +377,48 @@ class GSMBot(discord.Client):
         em.set_image(url = image)
 
         await self.send_message(message.channel, embed = em)
+
+    async def command_peek(self, message):
+        """
+        GSM Bot의 종료 전까지 선택한 사용자의 상태를 계속해서 감시합니다!
+        같은 사용자를 다시 입력할 시엔 감시가 해제됩니다.
+        1:1 채팅은 이 기능을 지원하지 않습니다.
+        """
+
+        if message.channel.is_private:
+            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
+            return
+
+        quest = await self.send_message(message.channel, "감시할 사용자를 언급해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
+        response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
+
+        await self.delete_message(quest)
+
+        if response == None or response.content.lower() == "cancel":
+            await self.send_message(message.channel, "감시가 취소되었습니다.")
+            return
+
+        standard = re.compile("<@!?(?P<value>\d+)>") # <@Discord_ID> 나 <@!Discord_ID>에서 Discord_ID만 빼오기 위해 value라는 이름으로 그룹을 지정함
+        user = response.content
+        result = standard.match(user) # standard 정규 표현식에 만족하는지 검사
+
+        if result: # 조건에 만족한다면
+            user = message.server.get_member(result.group("value")) # value로 이름붙인 그룹을 가져와서 discord.Member 객체를 얻음
+        else:
+            await self.send_message(message.channel, "올바르지 않은 ID 값이 들어왔습니다.")
+            return
+
+        if not user in self.peekList:
+            self.peekList.append(user)
+            await self.send_message(message.channel, "%s의 감시를 시작합니다!" % user.name)
+        else:
+            self.peekList.remove(user)
+            await self.send_message(message.channel, "%s의 감시를 해제합니다." % user.name)
+
+        peekNameList = str()
+        for i in self.peekList:
+            peekNameList += str(i)
+        print("현재 감시 명단 : %s" % peekNameList)
 
     async def message_log(self, message):
         channel_id = message.server.id # 해당 서버의 고유 아이디
