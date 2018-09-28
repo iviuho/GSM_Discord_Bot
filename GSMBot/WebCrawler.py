@@ -35,6 +35,7 @@ class crawler:
         index = self.get_count(today) # 아침, 점심, 저녁, 다음 날 아침중에 어떤 식사를 불러와야 하는지를 나타내는 정수
         try:
             today = today.replace(day = int(today.day + index / 3)) # 다음 날 아침을 불러와야 한다면 today에 다음 날로 바꾼 datetime 객체를 넣음
+
         except ValueError: # 한 달의 마지막 날에서 1이 더해진다면 ValueError가 발생하므로 예외 처리
             try:
                 today = today.replace(month = today.month + 1, day = 1) # 다음 달 1일로 바꾼 datetime 객체를 넣어준다
@@ -75,6 +76,10 @@ class crawler:
             print("[Error] GSM Bot can't get a menu")
             return "%s 급식을 불러올 수 없습니다." % item[index]
 
+        except IndexError:
+            print("[Error] GSM Bot can't get a menu")
+            return "%s 급식을 불러올 수 없습니다." % item[index]
+
     def calendar_process(self, soup):
         today = datetime.datetime.today()
         try:
@@ -88,7 +93,7 @@ class crawler:
             result += "```"
             
             return result
-            
+        
         except AttributeError:
             print("[Error] GSM Bot can't get a calendar")
             return "%s년 %s월 학사일정을 불러올 수 없습니다." % (today.year, today.month)
@@ -98,9 +103,10 @@ class crawler:
             info = soup.find_all("img")
             index = random.randint(1, len(info)) # 구글 자체 이미지가 포함되어 있기 때문에 1부터 시작한다
             return info[index]["src"] # 이미지의 링크를 가져옴
+        
         except:
             print("[Error] GSM Bot can't get a image")
-            return "이미지를 불러올 수 없습니다."
+            return None
 
 if __name__ == "__main__": # WebCrawler.py를 메인으로 실행할 때만 실행됨
     print(crawler().get_info("https://www.google.co.kr/search?tbm=isch&q=FUCK", "image"))

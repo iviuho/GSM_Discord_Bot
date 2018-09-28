@@ -8,11 +8,11 @@ import operator
 import re
 
 class GSMBot(discord.Client):
-    def __init__(self):
+    def __init__(self):        
         try:
             with open("admin.json", "r", encoding = "UTF8") as f:
                 temp =  json.load(f) # json 파일을 읽어들여서 저장해둠
-            self.admin = []
+            self.admin = list()
             for i in temp:
                 self.admin.append(temp[i]) # Bot 개발자들의 Discord ID를 admin에 추가함
         except FileNotFoundError:
@@ -31,15 +31,16 @@ class GSMBot(discord.Client):
         self.prefix = "gsm"
         self.color = 0x7ACDF4
         
-        self.allCommands = []
+        self.allCommands = list()
         for i in list(filter(lambda param: param.startswith("command_"), dir(self))):
             self.allCommands.append(i)
             
-        self.splitCommands = []
+        self.splitCommands = list()
         for i in self.allCommands:
             self.splitCommands.append(i.split("command_")[-1])
 
-        self.peekList = []
+        self.peekList = {}
+        self.serverCount = {}
 
         super().__init__()
     
@@ -70,13 +71,25 @@ class GSMBot(discord.Client):
             except TypeError: # None이 반환된다면 TypeError가 발생하므로 예외처리
                 print("[Error] %s is not command (User : %s)" % (command, message.author.name))
                 return
-
+    
     async def on_member_update(self, before, after):
-        if not before in self.peekList: # 감시 리스트에 있지 않으면 바로 리턴
+        await self.wait_until_ready()
+        
+        if not before in self.peekList.keys(): # 감시 리스트에 있지 않으면 바로 리턴
             return
-
+        
+        if not before.roles == after.roles:
+            return
+        
         msg = None
         em = None
+        limit = 0
+        
+        for i in self.servers:
+            if before in i.members:
+                limit += 1
+
+        self.serverCount.update({before : self.serverCount[before] + 1})
 
         if not before.status == after.status:
             def temp(status):
@@ -107,8 +120,8 @@ class GSMBot(discord.Client):
                 else:
                     return member.default_avatar_url
 
-            em = discord.Embed(title = "%s님이 프로필 사진을 바꾸셨습니다" % before.name)
-            em.set_image(temp(after))
+            em = discord.Embed(title = "%s님이 프로필 사진을 바꾸셨습니다" % before.name, colour = self.color)
+            em.set_image(url = temp(after))
 
         if not before.nick == after.nick:
             def temp(member): # 닉네임이 따로 설정되어 있지 않은 경우에 None이 출력되는 것을 막기 위한 함수
@@ -118,19 +131,12 @@ class GSMBot(discord.Client):
                     return member.name
 
             msg = "%s님이 %s에서 %s로 닉네임을 변경하셨습니다." % (before, temp(before), temp(after))
+            limit = 1
 
-        for i in before.server.channels: # 채널들을 받아옴
-            if i.type == discord.ChannelType.text: # 그 중에 텍스트 채널인 동시에,
-                if i.permissions_for(before.server.me).send_messages == True: # 메시지 보내기 권한이 있다면 메시지 출력
-                    await self.send_message(i, msg)
-                    return # 하나의 채널에만 보내기 위해서 return을 통해 탈출
-
-    async def on_member_remove(self, member):
-        for i in member.server.channels:
-            if i.type == discord.ChannelType.text:
-                if i.permissions_for(member.server.me).send_messages == True:
-                    await self.send_message(i, "%s님이 %s에서 탈주하셨습니다." % (member.author.name, member.server.name))
-                    return
+        if self.serverCount[before] == limit:
+            self.serverCount.update({before : 0})
+            for i in self.peekList[before]:
+                await self.send_message(i, msg, embed = em)
 
     async def command_gsm(self, message):
         """
@@ -207,8 +213,11 @@ class GSMBot(discord.Client):
         em = discord.Embed(title = "☆★☆★GSM Bot 초대 링크★☆★☆", description = "받으세요!", url = link, colour = self.color)
         msg = await self.send_message(message.channel, embed = em)
         await asyncio.sleep(15)
-        await self.delete_message(msg)
-        await self.send_message(message.channel, "초대 링크는 자동으로 삭제했습니다.")
+        try:
+            await self.delete_message(msg)
+            await self.send_message(message.channel, "초대 링크는 자동으로 삭제했습니다.")
+        except discord.errors.Forbidden:
+            pass    
 
     async def command_history(self, message):
         """
@@ -303,6 +312,7 @@ class GSMBot(discord.Client):
                 return
 
             content = response.content
+            await self.delete_message(response)
 
             if content.split()[0].lower() == "cancel": # Cancel을 입력했다면 함수를 종료하며 투표 생성 취소
                 await self.send_message(message.channel, "투표가 취소되었습니다.")
@@ -358,23 +368,34 @@ class GSMBot(discord.Client):
         quest = await self.send_message(message.channel, "검색어를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
 
-        await self.delete_message(quest)
+        try:
+            await self.delete_message(quest)
+        except discord.errors.Forbidden:
+            pass
 
         if response == None or response.content.lower() == "cancel":
             await self.send_message(message.channel, "이미지 검색이 취소되었습니다.")
             return
-
+        
         await self.send_typing(message.channel)
 
         keyword = response.content
+        try:
+            await self.delete_message(response)
+        except discord.errors.Forbidden:
+            pass
         print("%s : image %s" % (message.author, keyword))
         image = crawler().get_info("https://www.google.co.kr/search?tbm=isch&q=%s" % keyword, "image")
-        
-        em = discord.Embed(title = "%s의 이미지 검색 결과" % keyword, colour = self.color)
+
+        if image == None:
+            em = discord.Embed(title = "%s의 이미지 검색 결과" % keyword, description = "이미지를 불러올 수 없습니다.", colour = self.color)
+        else:
+            em = discord.Embed(title = "%s의 이미지 검색 결과" % keyword, colour = self.color)
+            em.set_image(url = image)
+            
         avatar = message.author.default_avatar_url if message.author.avatar_url == "" else message.author.avatar_url
         # 프로필 사진을 따로 지정해두지 않은 경우에 비어있는 문자열이 반환되므로 이 때는 기본 프로필 사진을 넣어줌
         em.set_footer(text = "%s님이 요청하신 검색 결과" % message.author.name, icon_url = avatar)
-        em.set_image(url = image)
 
         await self.send_message(message.channel, embed = em)
 
@@ -385,6 +406,10 @@ class GSMBot(discord.Client):
         1:1 채팅은 이 기능을 지원하지 않습니다.
         """
 
+        if not message.author.id in self.admin:
+            await self.send_message(message.channel, "점검 중")
+            return
+
         if message.channel.is_private:
             await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
             return
@@ -392,7 +417,10 @@ class GSMBot(discord.Client):
         quest = await self.send_message(message.channel, "감시할 사용자를 언급해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
 
-        await self.delete_message(quest)
+        try:
+            await self.delete_message(quest)
+        except discord.errors.Forbidden:
+            pass
 
         if response == None or response.content.lower() == "cancel":
             await self.send_message(message.channel, "감시가 취소되었습니다.")
@@ -408,17 +436,39 @@ class GSMBot(discord.Client):
             await self.send_message(message.channel, "올바르지 않은 ID 값이 들어왔습니다.")
             return
 
-        if not user in self.peekList:
-            self.peekList.append(user)
-            await self.send_message(message.channel, "%s의 감시를 시작합니다!" % user.name)
-        else:
-            self.peekList.remove(user)
-            await self.send_message(message.channel, "%s의 감시를 해제합니다." % user.name)
+        try:
+            await self.delete_message(response)
+        except discord.errors.Forbidden:
+            pass
 
-        peekNameList = str()
-        for i in self.peekList:
-            peekNameList += str(i)
-        print("현재 감시 명단 : %s" % peekNameList)
+        def printDictionary(dic):
+            string = str()
+            for i in dic.keys():
+                string += (str(i) + " ")
+            return ("현재 감시 명단 : %s" % string)
+        
+        self.serverCount.update({user : 0})
+
+        if not user in self.peekList.keys(): # 감시 리스트에 user가 없다면
+            self.peekList.update({user : [message.channel]}) # 새로 추가
+            await self.send_message(message.channel, "%s의 감시를 시작합니다!" % user.name)
+            print(printDictionary(self.peekList))
+            return
+        else: # 감시 리스트에 user가 있다면
+            for i in self.peekList[user]: # self.peekList[user]은 user의 채널의 리스트
+                if i.server == message.server: # 감시하고 있는 서버에서 다시 한번 입력됐을 때
+                    if len(self.peekList[user]) == 1:
+                        del self.peekList[user]
+                    else:
+                        self.peekList[user].remove(message.channel)
+                    await self.send_message(message.channel, "%s의 감시를 취소합니다." % user.name)
+                    print(printDictionary(self.peekList))
+                    return
+
+            self.peekList[user].append(message.channel) # 이미 user가 있지만 새로운 서버에서 peek을 실행했을 때
+            await self.send_message(message.channel, "%s의 감시를 시작합니다!" % user.name)
+            print(printDictionary(self.peekList))
+            return
 
     async def message_log(self, message):
         channel_id = message.server.id # 해당 서버의 고유 아이디
@@ -443,7 +493,7 @@ birth = datetime.datetime.today()
 print("%02d:%02d에 GSM Bot이 태어났습니다." % (birth.hour, birth.minute))
 
 GSMBot().run("NDg5NzA5MzUzNTM2ODQ3ODcy.DoW9QA.DWgVolFc8Jz19_8dQZNC_o_AOpQ")
-
+        
 dead = datetime.datetime.today()
 print("\n%02d:%02d에 GSM Bot이 죽었습니다." % (dead.hour, dead.minute))
 delta = dead - birth
