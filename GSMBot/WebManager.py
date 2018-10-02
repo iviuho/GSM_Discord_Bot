@@ -73,7 +73,7 @@ class WebManager:
             return "%s년 %s월 학사일정을 불러올 수 없습니다." % (today.year, today.month)
 
     def get_image(self, keyword):
-        soup = WebCrawler().get_soup("https://www.google.co.kr/search?tbm=isch&q=%s" % keyword)
+        soup = WebCrawler().get_soup("https://www.google.co.kr/search?hl=en&tbm=isch&q=%s" % keyword)
 
         try:
             info = soup.find_all("img")

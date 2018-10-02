@@ -5,8 +5,10 @@ import json
 import os
 import operator
 import re
+import time
 
 from WebManager import WebManager
+from YoutubeDownloader import Downloader
 
 class GSMBot(discord.Client):
     def __init__(self):
@@ -30,9 +32,15 @@ class GSMBot(discord.Client):
         if not os.path.exists("./vote"):
             os.makedirs("vote")
             print("[초기 설정] vote 디렉토리 생성")
+
+        if not os.path.exists("./bin"):
+            os.makedirs("bin")
+            print("[초기 설정] bin 디렉토리 생성")
             
         self.prefix = "gsm"
         self.color = 0x7ACDF4
+        self.WebManager = WebManager()
+        self.Downloader = Downloader()
 
         self.commands = list()
         for i in list(filter(lambda param: param.startswith("command_"), dir(self))):
@@ -74,7 +82,7 @@ class GSMBot(discord.Client):
                 pass
 
             try:
-                await func(message) # 저장했던 함수 실행     
+                await func(message) # 저장했던 함수 실행
             except TypeError: # 함수가 없어서 None이 반환됐을 때
                 print("[오류] %s는 명령어가 아닙니다. (User : %s)" % (command, message.author))
                 return
@@ -185,11 +193,11 @@ class GSMBot(discord.Client):
         """
         await self.send_typing(message.channel)
 
-        today = WebManager().get_nextDay()
+        today = self.WebManager.get_nextDay()
         title = "%s년 %s월 %s일 %s의 %s 식단표" % (today.year, today.month, today.day,
                 ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][int(today.weekday())],
-                ["아침", "점심", "저녁"][WebManager().get_nextMeal(today) % 3])
-        em = discord.Embed(title = title, description = WebManager().get_info("hungry"), colour = self.color)
+                ["아침", "점심", "저녁"][self.WebManager.get_nextMeal(today) % 3])
+        em = discord.Embed(title = title, description = self.WebManager.get_info("hungry"), colour = self.color)
         await self.send_message(message.channel, embed = em)
 
     async def command_calendar(self, message):
@@ -198,7 +206,7 @@ class GSMBot(discord.Client):
         """
         today = datetime.today()
         title = "%s년 %s월의 학사일정" % (today.year, today.month)
-        em = discord.Embed(title = title, description = WebManager().get_info("calendar"), colour = self.color)
+        em = discord.Embed(title = title, description = self.WebManager.get_info("calendar"), colour = self.color)
         await self.send_message(message.channel, embed = em)
 
     async def command_invite(self, message):
@@ -380,7 +388,7 @@ class GSMBot(discord.Client):
             pass
         
         print("%s : image %s" % (message.author, keyword))
-        image = WebManager().get_info("image", keyword)
+        image = self.WebManager.get_info("image", keyword)
 
         if image == None:
             em = discord.Embed(title = "%s의 이미지 검색 결과" % keyword, description = "이미지를 불러올 수 없습니다.", colour = self.color)
@@ -460,6 +468,46 @@ class GSMBot(discord.Client):
             print(printDictionary(self.peekList))
             return
 
+    async def command_youtube(self, message):
+        """
+        GSM Bot이 Youtube 링크를 입력받은 후,
+        그 링크를 MP3 파일로 추출해서 보내줍니다.
+        """
+        if not message.author.id in self.admin:
+            return
+
+        msg = await self.send_message(message.channel, "추출할 Youtube 링크를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
+        response = await self.wait_for_message(timeout = float(25), author = message.author, channel = message.channel)
+
+        try:
+            await self.delete_message(msg)
+        except discord.errors.Forbidden:
+            pass
+
+        if response == None or response.content.lower() == "cancel":
+            await self.send_message(message.channel, "Youtube 음원 추출이 취소되었습니다.")
+            return
+
+        content = response.content
+        try:
+            await self.delete_message(response)
+        except discord.errors.Forbidden:
+            pass
+
+        await self.send_message(message.channel, "Youtube 음원 추출을 시작합니다.")
+        
+        self.Downloader.download_music(content)
+        fileName = self.Downloader.get_fileName()
+
+        if fileName == None:
+            await self.send_message(message.channel, "Youtube 음원 추출에 실패했습니다.")
+            return
+
+        else:
+            with open(fileName, "rb") as f:
+                await self.send_file(message.channel, f)
+            os.remove(fileName)
+
     async def message_log(self, message):
         channel_id = message.server.id # 해당 서버의 고유 아이디
         directory = "./keyword/%s.json" % channel_id # 서버마다 json파일을 생성
@@ -479,5 +527,8 @@ class GSMBot(discord.Client):
         with open(directory, "w", encoding = "UTF8") as f: # 파일을 쓰기 모드로 열어서
             json.dump(temp, f, ensure_ascii = False, indent = 4) # 새로운 값으로 덮어쓰기한다
 
+start = time.time()
 bot = GSMBot()
 bot.run("NDg5NzA5MzUzNTM2ODQ3ODcy.DoW9QA.DWgVolFc8Jz19_8dQZNC_o_AOpQ")
+time = time.time() - start
+print("켜진 시간 : %02d:%02d:%02d" % (time / 3600, (time / 60) % 60, time % 60))
