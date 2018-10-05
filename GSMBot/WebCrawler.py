@@ -4,7 +4,10 @@ import random
 
 class WebCrawler:
     def get_html(self, url):
-        response = requests.get(url)
+        try:
+            response = requests.get(url)
+        except requests.exceptions.ConnectionError:
+            return None
         html = response.text
         return html
 

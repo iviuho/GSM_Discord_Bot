@@ -8,7 +8,6 @@ import re
 import time
 
 from WebManager import WebManager
-from YoutubeDownloader import Downloader
 
 class GSMBot(discord.Client):
     def __init__(self):
@@ -32,15 +31,10 @@ class GSMBot(discord.Client):
         if not os.path.exists("./vote"):
             os.makedirs("vote")
             print("[초기 설정] vote 디렉토리 생성")
-
-        if not os.path.exists("./bin"):
-            os.makedirs("bin")
-            print("[초기 설정] bin 디렉토리 생성")
             
         self.prefix = "gsm"
         self.color = 0x7ACDF4
         self.WebManager = WebManager()
-        self.Downloader = Downloader()
 
         self.commands = list()
         for i in list(filter(lambda param: param.startswith("command_"), dir(self))):
@@ -213,7 +207,7 @@ class GSMBot(discord.Client):
         """
         GSM Bot을 초대하기 위한 링크를 받습니다.
         """
-        link = "https://discordapp.com/oauth2/authorize?client_id=489709353536847872&scope=bot&permissions=1"
+        link = "https://discordapp.com/oauth2/authorize?client_id=%s&scope=bot&permissions=1" % self.user.id
         em = discord.Embed(title = "☆★☆★GSM Bot 초대 링크★☆★☆", description = "받으세요!", url = link, colour = self.color)
         msg = await self.send_message(message.channel, embed = em)
         await asyncio.sleep(15)
@@ -468,45 +462,22 @@ class GSMBot(discord.Client):
             print(printDictionary(self.peekList))
             return
 
-    async def command_youtube(self, message):
+    async def command_purge(self, message):
         """
-        GSM Bot이 Youtube 링크를 입력받은 후,
-        그 링크를 MP3 파일로 추출해서 보내줍니다.
+        GSM Bot이 보낸 메시지를 정리하는 기능입니다.
+        최근의 20개의 메시지에서 GSM Bot의 메시지를 검색하여 삭제합니다.
+        1:1 채팅은 이 기능을 지원하지 않습니다.
         """
-        if not message.author.id in self.admin:
+        if message.channel.is_private:
             return
-
-        msg = await self.send_message(message.channel, "추출할 Youtube 링크를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
-        response = await self.wait_for_message(timeout = float(25), author = message.author, channel = message.channel)
-
-        try:
-            await self.delete_message(msg)
-        except discord.errors.Forbidden:
-            pass
-
-        if response == None or response.content.lower() == "cancel":
-            await self.send_message(message.channel, "Youtube 음원 추출이 취소되었습니다.")
-            return
-
-        content = response.content
-        try:
-            await self.delete_message(response)
-        except discord.errors.Forbidden:
-            pass
-
-        await self.send_message(message.channel, "Youtube 음원 추출을 시작합니다.")
         
-        self.Downloader.download_music(content)
-        fileName = self.Downloader.get_fileName()
+        def is_self_message(message):
+            return message.author == self.user
+        
+        num = await self.purge_from(message.channel, limit = 20, check = is_self_message)
+        num = len(num)
 
-        if fileName == None:
-            await self.send_message(message.channel, "Youtube 음원 추출에 실패했습니다.")
-            return
-
-        else:
-            with open(fileName, "rb") as f:
-                await self.send_file(message.channel, f)
-            os.remove(fileName)
+        await self.send_message(message.channel, "GSM Bot의 메시지를 %d개 삭제했습니다." % num)
 
     async def message_log(self, message):
         channel_id = message.server.id # 해당 서버의 고유 아이디
@@ -529,6 +500,6 @@ class GSMBot(discord.Client):
 
 start = time.time()
 bot = GSMBot()
-bot.run("NDg5NzA5MzUzNTM2ODQ3ODcy.DoW9QA.DWgVolFc8Jz19_8dQZNC_o_AOpQ")
+bot.run(here_your_bot_token)
 time = time.time() - start
 print("켜진 시간 : %02d:%02d:%02d" % (time / 3600, (time / 60) % 60, time % 60))

@@ -1,7 +1,7 @@
-from WebCrawler import WebCrawler
-
 from datetime import datetime
 import random
+
+from WebCrawler import WebCrawler
 
 class WebManager:
     def get_nextDay(self):
