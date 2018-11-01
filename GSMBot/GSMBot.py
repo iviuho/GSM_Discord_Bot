@@ -437,7 +437,7 @@ class GSMBot(discord.Client):
             string = str()
             for i in dic.keys():
                 string += (str(i) + " ")
-            return ("현재 감시 명단 : %s" % string)
+            return "현재 감시 명단 : %s" % string
         
         self.serverCount.update({user : 0})
 

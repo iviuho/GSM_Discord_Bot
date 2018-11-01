@@ -1,5 +1,6 @@
 from datetime import datetime
 import random
+import re
 
 from WebCrawler import WebCrawler
 
@@ -12,9 +13,9 @@ class WebManager:
             today = today.replace(day = today.day + int(nextMeal / 3)) # 다음 날 아침을 불러와야 한다면 today에 다음 날로 바꾼 datetime 객체를 넣음
         except ValueError: # 한 달의 마지막 날에서 1이 더해진다면 ValueError가 발생하므로 예외 처리
             try:
-                today = today.replace(month = today.month + 1, day = 1) # 다음 달 1일로 바꾼 datetime 객체를 넣어준다
+                today = today.replace(month = today.month + 1, day = 1, hour = 0) # 다음 달 1일로 바꾼 datetime 객체를 넣어준다
             except ValueError: # 한 해의 마지막 달에서 1이 더해진다면 ValueError가 발생하므로 예외 처리
-                today = today.replace(year = today.year + 1, month = 1, day = 1) # 다음 년도 1월 1일로 바꾼 datetime 객체를 넣어준다
+                today = today.replace(year = today.year + 1, month = 1, day = 1, hour = 0) # 다음 년도 1월 1일로 바꾼 datetime 객체를 넣어준다
                 
         return today
 
@@ -34,23 +35,23 @@ class WebManager:
         nextMeal = self.get_nextMeal(today)
         item = ["아침", "점심", "저녁"]
 
-        soup = WebCrawler().get_soup("http://www.gsm.hs.kr/xboard/board.php?tbnum=8")
+        soup = WebCrawler().get_soup("http://www.gsm.hs.kr/xboard/board.php?tbnum=8&sYear=%s&sMonth=%s" % (today.year, today.month))
 
         try:
             info = soup.select("#xb_fm_list > div.calendar > ul > li > div > div.slider_food_list.slider_food%s.cycle-slideshow" % today.day)
             menuList = (info[0].find("div", {"data-cycle-pager-template" : "<a href=#none; class=today_food_on%s title=%s></a>" % (nextMeal % 3 + 1, item[nextMeal % 3])}).find("span", "content").text).split("\n")
 
-            for i in range(2): # 탄수화물, 단백질 등의 표시를 제외하고 출력하기 위해 맨 끝에 두 개를 지움
-                del menuList[-1]
+            p = re.compile("(?!에너지)[가-힣]+") # 영양성분 문장을 제외하기 위한 정규표현식
 
             result = ""
             for i in menuList:
-                result +=  ("- "+ i.split()[0] + "\n")
+                if p.match(i.split()[0]):
+                    result +=  ("- "+ i.split()[0] + "\n")
             return result
 
         except:
             print("[오류] GSM Bot이 식단표를 받아올 수 없습니다.")
-            return "%s 급식을 불러올 수 없습니다." % item[nextMeal]
+            return "%s 급식을 불러올 수 없습니다." % item[nextMeal % 3]
 
     def get_calendar(self, dump):
         today = datetime.today()
