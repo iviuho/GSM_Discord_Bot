@@ -14,9 +14,7 @@ class GSMBot(discord.Client):
         try:
             with open("admin.json", "r", encoding = "UTF8") as f:
                 temp =  json.load(f) # json 파일을 읽어들여서 저장해둠
-            self.admin = list()
-            for i in temp:
-                self.admin.append(temp[i]) # Bot 개발자들의 Discord ID를 admin에 추가함
+            self.admin = [temp[i] for i in temp] # Bot 개발자들의 Discord ID를 admin에 추가함
                 
         except FileNotFoundError:
             temp = {"example" : "here_your_discord_id"}
@@ -35,19 +33,18 @@ class GSMBot(discord.Client):
         self.prefix = "gsm"
         self.color = 0x7ACDF4
         self.WebManager = WebManager()
-
-        self.commands = list()
-        for i in list(filter(lambda param: param.startswith("command_"), dir(self))):
-            self.commands.append(i)
-
-        self.splitCommands = list()
-        for i in self.commands:
-            self.splitCommands.append(i.split("command_")[-1])
-
+        self.commands = [i for i in list(filter(lambda param: param.startswith("command_"), dir(self)))]
+        self.splitCommands = [i.split("command_")[-1] for i in self.commands]
         self.peekList = {}
         self.serverCount = {}
 
         super().__init__()
+
+    def public_only(func):
+        async def wrapper(self, message):
+            if message.channel.is_private:
+                await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
+        return wrapper
 
     async def on_ready(self):
         await self.change_presence(game = discord.Game(name = "명령어 : GSM"))
@@ -114,23 +111,11 @@ class GSMBot(discord.Client):
             msg = "%s님이 %s에서 %s로 상태를 바꿨습니다." % (before.name, temp(before.status), temp(after.status))
 
         if not before.game == after.game:
-            def temp(game):
-                if game:
-                    return game.name
-                else:
-                    return "휴식"
-
-            msg = "%s님이 %s을 시작하셨습니다." % (before.name, temp(after.game))
+            msg = "%s님이 %s을 시작하셨습니다." % (before.name, (lambda game: game.name if game else "휴식")(after.game))
 
         if not before.avatar == after.avatar:
-            def temp(member):
-                if member.avatar:
-                    return member.avatar_url
-                else:
-                    return member.default_avatar_url
-
             em = discord.Embed(title = "%s님이 프로필 사진을 바꾸셨습니다" % before.name, colour = self.color)
-            em.set_image(url = temp(after))
+            em.set_image(url = (lambda member: member.avatar_url if member.avatar else member.default_avatar_url)(after))
 
         if not before.nick == after.nick:
             def temp(member): # 닉네임이 따로 설정되어 있지 않은 경우에 None이 출력되는 것을 막기 위한 함수
@@ -170,7 +155,6 @@ class GSMBot(discord.Client):
     async def command_logout(self, message):
         """
         GSM Bot을 종료시킵니다.
-        Bot의 관리자만 사용 가능합니다.
         """
         if not message.author.id in self.admin: # 이 명령어를 입력한 사용자가 관리자인지 확인
             print("[오류] logout은 관리자 권한이 필요합니다. (User : %s)" % message.author.name)
@@ -183,7 +167,7 @@ class GSMBot(discord.Client):
     async def command_hungry(self, message):
         """
         GSM의 다음 식단표를 알려줍니다.
-        8:00, 13:30, 19:30을 기준으로 시간이 지나면 표시하는 식단표가 바뀝니다.
+        8:00, 13:30, 19:30을 기준으로 표시하는 식단표가 바뀝니다.
         """
         await self.send_typing(message.channel)
 
@@ -198,6 +182,7 @@ class GSMBot(discord.Client):
         """
         GSM의 한 달간의 학사일정을 알려줍니다.
         """
+        await self.send_typing(message.channel)
         today = datetime.today()
         title = "%s년 %s월의 학사일정" % (today.year, today.month)
         em = discord.Embed(title = title, description = self.WebManager.get_info("calendar"), colour = self.color)
@@ -218,14 +203,12 @@ class GSMBot(discord.Client):
         except discord.errors.Forbidden:
             pass
 
+    @public_only
     async def command_history(self, message):
         """
         해당 서버에서 채팅으로 많이 입력된 키워드들을 보여드립니다.
-        1:1 채팅은 이 기능을 지원하지 않습니다.
         """
-        if message.channel.is_private: # 채널이 Private이면 바로 그냥 리턴
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
+        await self.send_typing(message.channel)
 
         title = "%s의 입력된 키워드 순위" % message.server.name
         em = discord.Embed(title = title, colour = self.color)
@@ -233,7 +216,9 @@ class GSMBot(discord.Client):
         with open("./keyword/%s.json" % message.server.id, "r", encoding = "UTF8") as f:
             read = json.load(f)
         
-        sortedDict = sorted(read.items(), key = operator.itemgetter(1, 0), reverse = True) # 딕셔너리를 정렬한다. 기준은 value값(입력된 횟수)의 내림차순
+        sortedDict = sorted(sorted(read.items(), key = operator.itemgetter(0)), key = operator.itemgetter(1), reverse = True)
+        # 딕셔너리를 정렬한다. 기준은 value값(입력된 횟수)의 내림차순
+        
         for i in range(0, len(sortedDict)): # sortedDict의 길이만큼 반복하는데
             if i >= 10: # 10위까지만 보여주기 위해서
                 break
@@ -241,16 +226,11 @@ class GSMBot(discord.Client):
             
         await self.send_message(message.channel, embed = em)
 
+    @public_only
     async def command_vote(self, message):
         """
         주제를 정하고 OX 찬반 투표를 생성합니다.
-        1:1 채팅은 이 기능을 지원하지 않습니다.
-        또한 봇에게 메시지 관리 권한이 필요합니다.
         """
-        if message.channel.is_private:
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
-
         if not message.channel.permissions_for(message.server.get_member(self.user.id)).manage_messages:
             await self.send_message(message.channel, "Bot에게 메시지 관리 권한이 없습니다.")
             return
@@ -265,37 +245,40 @@ class GSMBot(discord.Client):
             except FileNotFoundError:
                 await self.send_message(message.channel, "%s 투표가 종료돼서 제대로 반영이 되지 않았습니다." % message.author.mention)
 
-            em = discord.Embed(title = "현재 %s에 대한 투표가 진행중입니다." % data["subject"], description = "앞에 GSM은 붙이지 않습니다.", colour = self.color)
+            _title = "현재 {}에 대한 투표가 진행중입니다.".format(data["subject"])
+            _desc = "{}, 1:1 채팅을 보냈습니다. 투표는 1:1 채팅에서 진행해주세요.".format(message.author.mention)
+            em = discord.Embed(title = _title, description = _desc, colour = self.color)
+            em.add_field(name = "투표 종료까지", value = "{}분 남았습니다.".format(int(((data["start"] + data["time"]) - time.time()) / 60)))
+
+            await self.send_message(message.channel, embed = em)
+
+            em = discord.Embed(title = "%s의 투표를 진행해주세요." % data["subject"], description = "앞에 GSM은 붙이지 않습니다.")
             em.add_field(name = "찬성 투표", value = "O 입력")
             em.add_field(name = "반대 투표", value = "X 입력")
-            
-            quest = await self.send_message(message.channel, embed = em)
+            privateQuest = await self.send_message(message.author, embed = em)
 
-            response = await self.wait_for_message(timeout = float(10), author = message.author, channel = message.channel)
+            response = await self.wait_for_message(timeout = float(30), author = message.author, channel = privateQuest.channel)
             # 명령어를 입력한 사용자로부터 답변을 기다린 후, response에 저장해둠
-            await self.delete_message(quest) # 질문할 때 보낸 메시지를 지움
 
             if response == None: # 질문에 대해 시간 초과가 일어나면 None이 리턴된다
-                await self.send_message(message.channel, "%s 투표가 제대로 되지 않았습니다. 다시 시도해주세요." % message.author.mention)
+                await self.send_message(privateQuest.channel, "%s 투표가 제대로 되지 않았습니다. 다시 시도해주세요." % message.author.mention)
                 return
 
             content = response.content
 
             if content.upper() == "O" or content.upper() == "X": # O나 X로 들어온 답변만 json파일에 입력함
-                await self.delete_message(response) # 익명 투표를 위해 답변 메시지도 지움
-
                 data.update({response.author.id : content.upper()}) # 파일을 읽고 받아온 딕셔너리를 업데이트한다
 
                 if os.path.exists(directory): # 투표를 하려고 명령어를 친 후에 투표가 끝나는 경우를 위해서 파일 재검사
                     with open(directory, "w", encoding = "UTF8") as f:
                         json.dump(data, f, ensure_ascii = False, indent = 4)
                 else: # 파일이 없다면 투표가 끝났다는 의미이므로 함수 종료
-                    await self.send_message(message.channel, "%s 투표가 종료돼서 제대로 반영이 되지 않았습니다." % message.author.mention)
+                    await self.send_message(privateQuest.channel, "%s 투표가 종료돼서 제대로 반영이 되지 않았습니다." % message.author.mention)
                     return
 
-                await self.send_message(message.channel, "%s의 투표가 잘 처리되었습니다." % response.author.name)
+                await self.send_message(privateQuest.channel, "%s의 투표가 잘 처리되었습니다." % response.author.name)
             else:
-                await self.send_message(message.channel, "%s 투표가 제대로 처리되지 않았습니다." % response.author.mention)
+                await self.send_message(privateQuest.channel, "%s 투표가 제대로 처리되지 않았습니다." % response.author.mention)
 
         else: # 투표가 진행되고 있지 않을 때
             msg = '투표 주제와 투표 시간을 입력해주세요.\n"10분동안 설문" 이라는 제목으로 10분동안 투표하려면\nex) "10분동안 설문 10" 라고 입력해주세요. 앞에 GSM 은 붙이지 않습니다.'
@@ -315,17 +298,16 @@ class GSMBot(discord.Client):
                 await self.send_message(message.channel, "투표가 취소되었습니다.")
 
             try:
-                time = float(content.split()[-1]) # 몇 분동안 투표를 진행할건지 파악하기 위해서 스플릿 마지막 결과 저장
+                _time = float(content.split()[-1]) # 몇 분동안 투표를 진행할건지 파악하기 위해서 스플릿 마지막 결과 저장
             except ValueError: # 문자열을 숫자로 바꾸려고 하면 ValueError 발생
                 await self.send_message(message.channel, "투표 시간이 제대로 입력되지 않았습니다.")
                 return
 
             content = content.split()[0:-1] # 스플릿 마지막 결과(시간)을 제외한 나머지를 content에 저장
-            subject = str() 
-            for i in content: # 입력받았을 때 처럼 띄어쓰기를 넣기 위함
-                subject += (i + " ")
+            subject = "".join([(i + " ") for i in content]) # 입력받았을 때 처럼 띄어쓰기를 넣기 위함
 
-            temp = {"subject" : subject} # 딕셔너리에 subject를 저장함
+            # 딕셔너리에 subject와 시작 시간, 투표 기간을 저장함
+            temp = {"subject" : subject, "start" : time.time(), "time" : _time * 60}
             with open(directory, "w", encoding = "UTF8") as f:
                 json.dump(temp, f, ensure_ascii = False, indent = 4) # temp 딕셔너리를 넣은 json파일 생성
 
@@ -333,12 +315,12 @@ class GSMBot(discord.Client):
             em.add_field(name = "%s" % subject, value = "gsm vote를 입력하시고 투표에 참가해주세요!")
             
             await self.send_message(message.channel, embed = em)
-            await asyncio.sleep(time * 60) # time을 분 단위로 받았지만 asyncio.sleep은 초 단위로 작동하므로 60을 곱해줌
+            await asyncio.sleep(_time * 60) # time을 분 단위로 받았지만 asyncio.sleep은 초 단위로 작동하므로 60을 곱해줌
             
             with open(directory, "r", encoding = "UTF8") as f:
                 data = json.load(f) # asyncio.sleep을 통해 대기하는 동안 추가된 데이터를 다시 읽어들임
 
-            del(data["subject"]) # 투표 주제를 제외한
+            del(data["subject"], data["start"], data["time"]) # 투표 주제와 시간 정보를 제외한
             result = {"O" : 0, "X" : 0} # 나머지 키:값쌍의 value값(O, X)을 저장함
             for i in data:
                 result[data[i]] += 1 # result 딕셔너리에 저장함
@@ -358,8 +340,7 @@ class GSMBot(discord.Client):
 
     async def command_image(self, message):
         """
-        구글에서 해당 키워드를 검색한 후,
-        결과를 사진으로 보내줍니다.
+        구글에서 해당 키워드를 검색한 후, 결과를 사진으로 보내줍니다.
         """
         quest = await self.send_message(message.channel, "검색어를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
@@ -396,16 +377,12 @@ class GSMBot(discord.Client):
 
         await self.send_message(message.channel, embed = em)
 
+    @public_only
     async def command_peek(self, message):
         """
         GSM Bot의 종료 전까지 선택한 사용자의 상태를 계속해서 감시합니다!
         같은 사용자를 다시 입력할 시엔 감시가 해제됩니다.
-        1:1 채팅은 이 기능을 지원하지 않습니다.
         """
-        if message.channel.is_private:
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
-
         quest = await self.send_message(message.channel, "감시할 사용자를 언급해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
 
@@ -462,29 +439,24 @@ class GSMBot(discord.Client):
             print(printDictionary(self.peekList))
             return
 
+    @public_only
     async def command_purge(self, message):
         """
         GSM Bot이 보낸 메시지를 정리하는 기능입니다.
         최근의 20개의 메시지에서 GSM Bot의 메시지를 검색하여 삭제합니다.
-        1:1 채팅은 이 기능을 지원하지 않습니다.
         """
-        if message.channel.is_private:
+        if not message.channel.permissions_for(message.server.get_member(self.user.id)).read_message_history:
+            await self.send_message(message.channel, "Bot에게 메시지 기록 보기 권한이 없습니다.")
             return
-        
-        def is_self_message(message):
-            return message.author == self.user
-        
-        num = await self.purge_from(message.channel, limit = 20, check = is_self_message)
-        num = len(num)
 
+        num = len(await self.purge_from(message.channel, limit = 20, check = lambda message: message.author == self.user))
         await self.send_message(message.channel, "GSM Bot의 메시지를 %d개 삭제했습니다." % num)
 
     async def message_log(self, message):
-        channel_id = message.server.id # 해당 서버의 고유 아이디
-        directory = "./keyword/%s.json" % channel_id # 서버마다 json파일을 생성
+        directory = "./keyword/%s.json" % message.server.id # 해당 서버의 고유 아이디마다 json파일을 생성
         
         if os.path.exists(directory): # 파일이 이미 존재한다면
-            with open(directory, "r", encoding = "UTF8") as f: 
+            with open(directory, "r", encoding = "UTF8") as f:
                 temp = json.load(f) # 파일을 딕셔너리로 읽어온다
         else: # 파일이 없다면
             temp = {} # 비어있는 딕셔너리 생성
@@ -492,7 +464,7 @@ class GSMBot(discord.Client):
         for i in message.content.split():
             if i in self.splitCommands: # 명령어는 키워드로 카운트하지 않기 위해서 제외함
                 continue
-            value = (lambda b: temp[i] + 1 if b else 1)(i in temp.keys()) # 키워드가 이미 있는지 없는지 검사해서, 있다면 기존 값 + 1 리턴, 없다면 1 리턴
+            value = (lambda _bool: temp[i] + 1 if _bool else 1)(i in temp.keys()) # 키워드가 이미 있는지 없는지 검사해서, 있다면 기존 값 + 1 리턴, 없다면 1 리턴
             temp.update({i : value}) # temp 딕셔너리를 업데이트한다. 값이 이미 있다면 값을 바꾸고, 없다면 새로 키:값 쌍을 추가한다
 
         with open(directory, "w", encoding = "UTF8") as f: # 파일을 쓰기 모드로 열어서
@@ -501,5 +473,5 @@ class GSMBot(discord.Client):
 start = time.time()
 bot = GSMBot()
 bot.run(here_your_bot_token)
-time = time.time() - start
-print("켜진 시간 : %02d:%02d:%02d" % (time / 3600, (time / 60) % 60, time % 60))
+_time = time.time() - start
+print("켜진 시간 : %02d:%02d:%02d" % (_time / 3600, (_time / 60) % 60, _time % 60))
