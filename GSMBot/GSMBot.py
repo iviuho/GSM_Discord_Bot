@@ -40,6 +40,16 @@ class GSMBot(discord.Client):
 
         super().__init__()
 
+    def public_only(original_func):
+        async def wrapper(self, message):
+            if message.channel.is_private:
+                await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
+                return
+            else:
+                return await original_func(self, message)
+        wrapper.__doc__ = original_func.__doc__
+        return wrapper
+
     async def on_ready(self):
         await self.change_presence(game = discord.Game(name = "명령어 : GSM"))
         print("GSM Bot 준비 완료!", end = "\n\n")
@@ -197,14 +207,11 @@ class GSMBot(discord.Client):
         except discord.errors.Forbidden:
             pass
 
+    @public_only
     async def command_history(self, message):
         """
         해당 서버에서 채팅으로 많이 입력된 키워드들을 보여드립니다.
         """
-        if message.channel.is_private: # 채널이 Private이면 바로 그냥 리턴
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
-
         await self.send_typing(message.channel)
 
         title = "%s의 입력된 키워드 순위" % message.server.name
@@ -223,14 +230,11 @@ class GSMBot(discord.Client):
             
         await self.send_message(message.channel, embed = em)
 
+    @public_only
     async def command_vote(self, message):
         """
         주제를 정하고 OX 찬반 투표를 생성합니다.
         """
-        if message.channel.is_private:
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
-
         if not message.channel.permissions_for(message.server.get_member(self.user.id)).manage_messages:
             await self.send_message(message.channel, "Bot에게 메시지 관리 권한이 없습니다.")
             return
@@ -377,15 +381,12 @@ class GSMBot(discord.Client):
 
         await self.send_message(message.channel, embed = em)
 
+    @public_only
     async def command_peek(self, message):
         """
         GSM Bot의 종료 전까지 선택한 사용자의 상태를 계속해서 감시합니다!
         같은 사용자를 다시 입력할 시엔 감시가 해제됩니다.
         """
-        if message.channel.is_private:
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
-
         quest = await self.send_message(message.channel, "감시할 사용자를 언급해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout = float(15), author = message.author, channel = message.channel)
 
@@ -442,15 +443,12 @@ class GSMBot(discord.Client):
             print(printDictionary(self.peekList))
             return
 
+    @public_only
     async def command_purge(self, message):
         """
         GSM Bot이 보낸 메시지를 정리하는 기능입니다.
         최근의 20개의 메시지에서 GSM Bot의 메시지를 검색하여 삭제합니다.
         """
-        if message.channel.is_private:
-            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-            return
-
         if not message.channel.permissions_for(message.server.get_member(self.user.id)).read_message_history:
             await self.send_message(message.channel, "Bot에게 메시지 기록 보기 권한이 없습니다.")
             return
