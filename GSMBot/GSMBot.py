@@ -518,7 +518,7 @@ class GSMBot(discord.Client):
                 await self.send_message(message.channel, "검색을 종료합니다.")
                 return
             try:
-                self.delete_message(query)
+                await self.delete_message(query)
             except discord.errors.Forbidden:
                 pass
 
