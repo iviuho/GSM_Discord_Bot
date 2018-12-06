@@ -47,6 +47,11 @@ class WebManager:
             for i in menuList:
                 if p.match(i.split()[0]):
                     result +=  ("- "+ i.split()[0] + "\n")
+
+            # result의 길이가 0이면
+            if not len(result):
+                raise Exception
+
             return result
 
         except:
@@ -66,6 +71,8 @@ class WebManager:
                 if not i.find("dd") == None:
                     text = i.text.replace("\n", "")
                     result += "%6s -%s\n" % (text.split("-")[0], text.split("-")[1])
+                    for i in text.split("-")[2:]:
+                        result += "%7s -%s\n" % ("", i)
             result += "```"
             return result
 
