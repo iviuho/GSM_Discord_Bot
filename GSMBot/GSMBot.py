@@ -12,10 +12,10 @@ class GSMBot(discord.Client):
         try:
             with open("admin.json", "r", encoding = "UTF8") as f:
                 temp =  json.load(f) # json 파일을 읽어들여서 저장해둠
-            self.admin = [temp[i] for i in temp] # Bot 개발자들의 Discord ID를 admin에 추가함
+            self.admin = [temp[i] for i in temp.keys()] # Bot 개발자들의 Discord ID를 admin에 추가함
                 
         except FileNotFoundError:
-            temp = {"example" : "here_your_discord_id"}
+            temp = {"memo" : "here_your_discord_id"}
             with open("admin.json", "w", encoding = "UTF8") as f:
                 json.dump(temp, f, ensure_ascii = False, indent = 4)
             print("[초기 설정] admin.json 파일 생성")
@@ -495,7 +495,7 @@ class GSMBot(discord.Client):
         
         search_query = "ytsearch5:%s" % response.content
 
-        status = await self.send_message(message.channel, "현재 겁나 열심히 검색중입니다! (•́⌄•́๑)و")
+        status = await self.send_message(message.channel, "현재 겁나 열심히 검색중입니다! (•⌄•๑)و")
         await self.send_typing(message.channel)
 
         with youtube_dl.YoutubeDL(options) as yt:
@@ -515,12 +515,13 @@ class GSMBot(discord.Client):
             response = await self.wait_for_reaction(emoji = [u"\U0001F44D", u"\U0001F44E"], timeout = float(20), user = message.author, message = query)
 
             if response == None or response.reaction.emoji == u"\U0001F44D":
-                await self.send_message(message.channel, "검색을 종료합니다.")
-                return
+                break
             try:
                 await self.delete_message(query)
             except discord.errors.Forbidden:
                 pass
+            
+        await self.send_message(message.channel, "검색을 종료합니다.")
 
     async def message_log(self, message):
         directory = "./keyword/%s.json" % message.server.id # 해당 서버의 고유 아이디마다 json파일을 생성

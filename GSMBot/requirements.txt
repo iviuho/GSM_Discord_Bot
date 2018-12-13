@@ -8,7 +8,7 @@ bs4 == 0.0.1
 discord.py == 0.16.12
 
 # WebCrawler.py: 1
-requests == 2.18.4
+requests == 2.20.0
 
 # GSMBot.py: 468
 youtube_dl == 2018.11.18
