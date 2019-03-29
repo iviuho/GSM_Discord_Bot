@@ -7,6 +7,28 @@ import time
 
 from WebManager import WebManager
 
+
+def public_only(original_func):
+    async def wrapper(self, message):
+        if message.channel.is_private:
+            await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
+            return
+        else:
+            return await original_func(self, message)
+    wrapper.__doc__ = original_func.__doc__
+    return wrapper
+
+
+def admin_only(original_func):
+    async def wrapper(self, message):
+        if not message.author.id in self.admin:
+            await self.send_message(message.channel, "관리자만 사용 가능한 명령어입니다. :(")
+            return
+        else:
+            return await original_func(self, message)
+    wrapper.__doc__ = original_func.__doc__
+    return wrapper
+
 class GSMBot(discord.Client):
     def __init__(self):
         try:
@@ -38,26 +60,6 @@ class GSMBot(discord.Client):
         self.appInfo = None
 
         super().__init__()
-
-    def public_only(original_func):
-        async def wrapper(self, message):
-            if message.channel.is_private:
-                await self.send_message(message.channel, "비공개 채팅에서는 지원하지 않습니다. :(")
-                return
-            else:
-                return await original_func(self, message)
-        wrapper.__doc__ = original_func.__doc__
-        return wrapper
-
-    def admin_only(original_func):
-        async def wrapper(self, message):
-            if not message.author.id in self.admin:
-                await self.send_message(message.channel, "관리자만 사용 가능한 명령어입니다. :(")
-                return
-            else:
-                return await original_func(self, message)
-        wrapper.__doc__ = original_func.__doc__
-        return wrapper
 
     async def on_ready(self):
         await self.change_presence(game = discord.Game(name = "명령어 : GSM"))
