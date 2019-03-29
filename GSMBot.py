@@ -29,6 +29,25 @@ def admin_only(original_func):
     wrapper.__doc__ = original_func.__doc__
     return wrapper
 
+
+def mapping_state_to_message(status):
+    if status == discord.Status.online:
+        return "온라인"
+    elif status == discord.Status.offline:
+        return "오프라인"
+    elif status == discord.Status.idle:
+        return "자리비움"
+    elif status == discord.Status.do_not_disturb:
+        return "다른 용무중"
+
+def get_nickname(member):
+    if member.nick:
+        return member.nick
+    else:
+        return member.name
+
+weekend_string = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+
 class GSMBot(discord.Client):
     def __init__(self):
         try:
@@ -110,17 +129,9 @@ class GSMBot(discord.Client):
         self.serverCount[before] += 1
 
         if not before.status == after.status:
-            def temp(status):
-                if status == discord.Status.online:
-                    return "온라인"
-                elif status == discord.Status.offline:
-                    return "오프라인"
-                elif status == discord.Status.idle:
-                    return "자리비움"
-                elif status == discord.Status.do_not_disturb:
-                    return "다른 용무중"
-
-            msg = "%s님이 %s에서 %s로 상태를 바꿨습니다." % (before.name, temp(before.status), temp(after.status))
+            
+            msg = "%s님이 %s에서 %s로 상태를 바꿨습니다." % (
+                before.name, mapping_state_to_message(before.status), mapping_state_to_message(after.status))
 
         if not before.game == after.game:
             msg = "%s님이 %s을 시작하셨습니다." % (before.name, (lambda game: game.name if game else "휴식")(after.game))
@@ -152,17 +163,18 @@ class GSMBot(discord.Client):
         GSM Bot의 명령어를 모두 출력합니다.
         """
         await self.send_typing(message.channel)
-        msg = "이것은 [GSM](https://www.gsm.hs.kr/)의 학생들을 위해서 만들어진 학교 전용 봇입니다.\n그렇기 때문에 오직 [GSM](https://www.gsm.hs.kr/) 학생들을 위한 편의기능만 제공하고 있습니다.\n"
 
         commandHelp = str()
         for i in self.commands: # GSM Bot의 모든 요소를 불러온 후, command_로 시작하는 함수들만 리스트로 만들어서 출력
             commandHelp += "***%s***\n" % (i.split("_")[-1]) # command_x에서 _를 기준으로 맨 뒤, 즉 x만 msg에 추가한다
             commandHelp += "%s\n" % (getattr(self, i).__doc__).strip()
 
-        em = discord.Embed(title = "**GSM Bot**", description = msg, colour = 0x7ACDF4)
-        em.add_field(name = "**GSM Bot의 명령어**", value = commandHelp)
-        em.set_thumbnail(url = "http://www.gsm.hs.kr/data_files/skin/skin_high_gsmhs/images/common/logo.png")
-        await self.send_message(message.channel, embed = em)
+        em = discord.Embed(title="**GSM Bot**",
+                           description=self.DESCRIPTION_MESSAGE, colour=0x7ACDF4)
+        em.add_field(name="**GSM Bot의 명령어**", value=commandHelp)
+        em.set_thumbnail(
+            url="http://www.gsm.hs.kr/data_files/skin/skin_high_gsmhs/images/common/logo.png")
+        await self.send_message(message.channel, embed=em)
 
     @admin_only
     async def command_logout(self, message):
@@ -181,10 +193,11 @@ class GSMBot(discord.Client):
 
         today = self.WebManager.get_nextDay()
         title = "%s년 %s월 %s일 %s의 %s 식단표" % (today.year, today.month, today.day,
-                ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][int(today.weekday())],
-                ["아침", "점심", "저녁"][self.WebManager.get_nextMeal(today) % 3])
-        em = discord.Embed(title = title, description = self.WebManager.get_info("hungry"), colour = self.color)
-        await self.send_message(message.channel, embed = em)
+                                            weekend_string[int(today.weekday())],
+                                            ["아침", "점심", "저녁"][self.WebManager.get_nextMeal(today) % 3])
+        em = discord.Embed(title=title, description=self.WebManager.get_info(
+            "hungry"), colour=self.color)
+        await self.send_message(message.channel, embed=em)
 
     async def command_calendar(self, message):
         """
