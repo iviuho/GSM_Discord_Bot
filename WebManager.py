@@ -41,12 +41,13 @@ class WebManager:
             info = soup.select("#xb_fm_list > div.calendar > ul > li > div > div.slider_food_list.slider_food%s.cycle-slideshow" % today.day)
             menuList = (info[0].find("div", {"data-cycle-pager-template" : "<a href=#none; class=today_food_on%s title=%s></a>" % (nextMeal % 3 + 1, item[nextMeal % 3])}).find("span", "content").text).split("\n")
 
-            p = re.compile("(?!에너지)[가-힣]+") # 영양성분 문장을 제외하기 위한 정규표현식
+            p = re.compile("(?!에너지)[가-힣&\s]+") # 영양성분 문장을 제외하기 위한 정규표현식
 
             result = ""
             for i in menuList:
-                if p.match(i.split()[0]):
-                    result +=  ("- "+ i.split()[0] + "\n")
+                value = p.match(i)
+                if value:
+                    result +=  ("- "+ value.group() + "\n")
 
             # result의 길이가 0이면
             if not len(result):
