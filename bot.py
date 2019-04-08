@@ -1,12 +1,15 @@
-import discord
 import asyncio
-from datetime import datetime
+import discord
 import json
+import operator
 import os
+import re
 import time
+import youtube_dl
+from datetime import datetime
+from functools import partial
 
-from WebManager import WebManager
-
+from web_crawler import DataManager
 
 def public_only(original_func):
     async def wrapper(self, message):
@@ -40,42 +43,53 @@ def mapping_state_to_message(status):
     elif status == discord.Status.do_not_disturb:
         return "다른 용무중"
 
+
 def get_nickname(member):
     if member.nick:
         return member.nick
     else:
         return member.name
 
+
+def runtime_calc():
+    start = time.time()
+    yield None
+    yield time.time() - start
+
+
 weekend_string = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 
 class GSMBot(discord.Client):
     def __init__(self):
-        try:
+        if os.path.exists("admin.json"):
             with open("admin.json", "r", encoding="UTF8") as f:
-                temp = json.load(f)  # json 파일을 읽어들여서 저장해둠
-            # Bot 개발자들의 Discord ID를 admin에 추가함
-            self.admin = [temp[i] for i in temp.keys()]
-
-        except FileNotFoundError:
-            temp = {"memo": "here_your_discord_id"}
+                # Bot 관리자들의 Discord ID를 admin에 추가함
+                temp = json.load(f)
+                self.admin = [temp[i] for i in temp.keys()]
+        else:
+            print("[Setup] Created admin.json file")
             with open("admin.json", "w", encoding="UTF8") as f:
-                json.dump(temp, f, ensure_ascii=False, indent=4)
-            print("[초기 설정] admin.json 파일 생성")
+                json.dump({"memo": "here_your_discord_id"}, f, ensure_ascii=False, indent=4)
 
-        if not os.path.exists("./keyword"):
+        if not os.path.exists("keyword"):
+            print("[Setup] Created keyword directory")
             os.makedirs("keyword")
-            print("[초기 설정] keyword 디렉토리 생성")
 
-        if not os.path.exists("./vote"):
+        if not os.path.exists("vote"):
+            print("[Setup] Created vote directory")
             os.makedirs("vote")
-            print("[초기 설정] vote 디렉토리 생성")
 
         self.prefix = "gsm"
         self.color = 0x7ACDF4
-        self.WebManager = WebManager()
-        self.commands = [i for i in list(
+        self.DataManager = DataManager()
+        self.commands = [i.split("command_")[-1] for i in list(
             filter(lambda param: param.startswith("command_"), dir(self)))]
-        self.splitCommands = [i.split("command_")[-1] for i in self.commands]
+
+        # GSM Bot의 모든 요소를 불러온 후, command_로 시작하는 함수들만 리스트로 만들어서 출력
+        # command_x에서 _를 기준으로 맨 뒤, 즉 x만 msg에 추가한다
+        self.commandDocs = "".join(["***%s***\n%s\n" %
+            (i.split("_")[-1], (getattr(self, "command_%s" % i).__doc__).strip()) for i in self.commands])
+
         self.peekList = {}
         self.serverCount = {}
         self.appInfo = None
@@ -91,7 +105,7 @@ class GSMBot(discord.Client):
     async def on_message(self, message):
         await self.wait_until_ready()
 
-        if not message.author.bot:  # Bot이 보낸 메시지를 인식하지 않게 하기 위함
+        if not message.author.bot:
             if message.channel.is_private == False:
                 await self.message_log(message)
 
@@ -106,8 +120,9 @@ class GSMBot(discord.Client):
             # 해당 명령어가 존재하지 않는다면 None을 반환한다.
 
             try:  # 디스코드 닉네임이 인식할 수 없는 문자인 경우에 UnicodeEncodeError가 발생하므로 예외처리
-                print("[%02d:%02d] %s : %s" % (datetime.today().hour,
-                                               datetime.today().minute, message.author, command))
+                today = datetime.today()
+                print("[%02d:%02d] %s : %s"
+                    % (today.hour, today.minute, message.author, command))
             except UnicodeEncodeError:
                 pass
 
@@ -115,7 +130,7 @@ class GSMBot(discord.Client):
                 await func(message)  # 저장했던 함수 실행
             else:  # 함수가 없어서 None이 반환됐을 때
                 print("[오류] %s는 명령어가 아닙니다. (User : %s)" %
-                      (command, message.author))
+                    (command, message.author))
                 return
 
     async def on_member_update(self, before, after):
@@ -136,7 +151,6 @@ class GSMBot(discord.Client):
         self.serverCount[before] += 1
 
         if not before.status == after.status:
-            
             msg = "%s님이 %s에서 %s로 상태를 바꿨습니다." % (
                 before.name, mapping_state_to_message(before.status), mapping_state_to_message(after.status))
 
@@ -151,7 +165,6 @@ class GSMBot(discord.Client):
                 lambda member: member.avatar_url if member.avatar else member.default_avatar_url)(after))
 
         if not before.nick == after.nick:
-
             msg = "%s님이 %s에서 %s로 닉네임을 변경하셨습니다." % (
                 before, get_nickname(before), get_nickname(after))
             limit = 1
@@ -170,15 +183,9 @@ class GSMBot(discord.Client):
         """
         await self.send_typing(message.channel)
 
-        commandHelp = str()
-        for i in self.commands:  # GSM Bot의 모든 요소를 불러온 후, command_로 시작하는 함수들만 리스트로 만들어서 출력
-            # command_x에서 _를 기준으로 맨 뒤, 즉 x만 msg에 추가한다
-            commandHelp += "***%s***\n" % (i.split("_")[-1])
-            commandHelp += "%s\n" % (getattr(self, i).__doc__).strip()
-
         em = discord.Embed(title="**GSM Bot**",
                            description=self.DESCRIPTION_MESSAGE, colour=0x7ACDF4)
-        em.add_field(name="**GSM Bot의 명령어**", value=commandHelp)
+        em.add_field(name="**GSM Bot의 명령어**", value=self.commandDocs)
         em.set_thumbnail(
             url="http://www.gsm.hs.kr/data_files/skin/skin_high_gsmhs/images/common/logo.png")
         await self.send_message(message.channel, embed=em)
@@ -198,11 +205,11 @@ class GSMBot(discord.Client):
         """
         await self.send_typing(message.channel)
 
-        today = self.WebManager.get_nextDay()
+        today = self.DataManager.get_nextDay()
         title = "%s년 %s월 %s일 %s의 %s 식단표" % (today.year, today.month, today.day,
-                                            weekend_string[int(today.weekday())],
-                                            ["아침", "점심", "저녁"][self.WebManager.get_nextMeal(today) % 3])
-        em = discord.Embed(title=title, description=self.WebManager.get_info(
+            weekend_string[int(today.weekday())],
+            ["아침", "점심", "저녁"][self.DataManager.get_nextMeal(today) % 3])
+        em = discord.Embed(title=title, description=self.DataManager.get_info(
             "hungry"), colour=self.color)
         await self.send_message(message.channel, embed=em)
 
@@ -213,7 +220,7 @@ class GSMBot(discord.Client):
         await self.send_typing(message.channel)
         today = datetime.today()
         title = "%s년 %s월의 학사일정" % (today.year, today.month)
-        em = discord.Embed(title=title, description=self.WebManager.get_info(
+        em = discord.Embed(title=title, description=self.DataManager.get_info(
             "calendar"), colour=self.color)
         await self.send_message(message.channel, embed=em)
 
@@ -228,7 +235,7 @@ class GSMBot(discord.Client):
         link = discord.utils.oauth_url(
             self.appInfo.id, permissions=permissions)
         em = discord.Embed(title="☆★☆★GSM Bot 초대 링크★☆★☆",
-                           description="받으세요!", url=link, colour=self.color)
+            description="받으세요!", url=link, colour=self.color)
         msg = await self.send_message(message.channel, embed=em)
         await asyncio.sleep(15)
 
@@ -243,8 +250,6 @@ class GSMBot(discord.Client):
         """
         해당 서버에서 채팅으로 많이 입력된 키워드들을 보여드립니다.
         """
-        import operator
-
         await self.send_typing(message.channel)
 
         title = "%s의 입력된 키워드 순위" % message.server.name
@@ -419,7 +424,7 @@ class GSMBot(discord.Client):
             pass
 
         print("%s : image %s" % (message.author, keyword))
-        image = self.WebManager.get_info("image", keyword)
+        image = self.DataManager.get_info("image", keyword)
 
         if image == None:
             em = discord.Embed(title="%s의 이미지 검색 결과" % keyword,
@@ -442,8 +447,6 @@ class GSMBot(discord.Client):
         GSM Bot의 종료 전까지 선택한 사용자의 상태를 계속해서 감시합니다!
         같은 사용자를 다시 입력할 시엔 감시가 해제됩니다.
         """
-        import re
-
         quest = await self.send_message(message.channel, "감시할 사용자를 언급해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
         response = await self.wait_for_message(timeout=float(15), author=message.author, channel=message.channel)
 
@@ -458,7 +461,7 @@ class GSMBot(discord.Client):
 
         user = response.content
         # <@Discord_ID> 나 <@!Discord_ID>에서 Discord_ID만 빼오기 위해 value라는 이름으로 그룹을 지정함
-        result = re.compile("<@!?(?P<value>\d+)>").match(user)
+        result = re.compile("<@!?(?P<value>\\d+)>").match(user)
 
         if result:  # 조건에 만족한다면
             # value로 이름붙인 그룹을 가져와서 discord.Member 객체를 얻음
@@ -514,9 +517,6 @@ class GSMBot(discord.Client):
         """
         유튜브에서 해당 키워드를 검색한 후, 원하는 결과를 URL로 보내드립니다.
         """
-        import youtube_dl
-        from functools import partial
-
         options = {
             "format": "bestaudio/best",
             "extractaudio": True,
@@ -583,7 +583,7 @@ class GSMBot(discord.Client):
             temp = {}  # 비어있는 딕셔너리 생성
 
         for i in message.content.split():
-            if i in self.splitCommands:  # 명령어는 키워드로 카운트하지 않기 위해서 제외함
+            if i in self.commands:  # 명령어는 키워드로 카운트하지 않기 위해서 제외함
                 continue
             # 키워드가 이미 있는지 없는지 검사해서, 있다면 기존 값 + 1 리턴, 없다면 1 리턴
             value = (lambda _bool: temp[i] +
@@ -593,10 +593,3 @@ class GSMBot(discord.Client):
 
         with open(directory, "w", encoding="UTF8") as f:  # 파일을 쓰기 모드로 열어서
             json.dump(temp, f, ensure_ascii=False, indent=4)  # 새로운 값으로 덮어쓰기한다
-
-
-start = time.time()
-bot = GSMBot()
-bot.run(HERE_YOUR_BOT_TOKEN)
-_time = time.time() - start
-print("켜진 시간 : %02d:%02d:%02d" % (_time / 3600, (_time / 60) % 60, _time % 60))
