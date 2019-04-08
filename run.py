@@ -1,7 +1,6 @@
 from bot import GSMBot, runtime_calc
 
-# TOKEN = "HERE_YOUR_BOTS_TOKEN"
-TOKEN = "NDg5NzA5MzUzNTM2ODQ3ODcy.D3DLww.R_0IFgHAktXs2pH_mkTMOSnrv7E"
+TOKEN = "HERE_YOUR_BOTS_TOKEN"
 timer = runtime_calc()
 
 next(timer)
