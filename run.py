@@ -1,10 +1,10 @@
-from bot import GSMBot, runtime_calc
+from bot import GSMBot, Timer
 
 TOKEN = "HERE_YOUR_BOTS_TOKEN"
-timer = runtime_calc()
+timer = Timer()
 
-next(timer)
+timer.start()
 GSMBot().run(TOKEN)
-runtime = next(timer)
+hour, minute, second = timer.end()
 
-print("Run Time : %02d:%02d:%02d" % (runtime / 3600, (runtime / 60) % 60, runtime % 60))
+print("Run Time : %02d:%02d:%02d" % (hour, minute, second))

@@ -50,20 +50,27 @@ def get_nickname(member):
     else:
         return member.name
 
-
-def runtime_calc():
-    start = time.time()
-    yield None
-    yield time.time() - start
-
 def get_peeklist_to_string(dic):
     string = str()
     for i in dic.keys():
         string += (str(i) + " ")
     return "현재 감시 명단 : %s" % string
 
-
 weekend_string = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+
+
+class Timer:
+    def start(self):
+        self.start_time = time.time()
+
+    def end(self):
+        delta_time = time.time() - self.start_time
+        return (
+            delta_time / 3600,
+            (delta_time / 60) % 60,
+            delta_time % 60
+        )
+
 
 class GSMBot(discord.Client):
     def __init__(self):
