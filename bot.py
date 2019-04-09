@@ -9,7 +9,7 @@ import youtube_dl
 from datetime import datetime
 from functools import partial
 
-from web_crawler import DataManager
+from web_crawler import DataManager, TimeCalculator
 
 def public_only(original_func):
     async def wrapper(self, message):
@@ -56,6 +56,12 @@ def runtime_calc():
     yield None
     yield time.time() - start
 
+def get_peeklist_to_string(dic):
+    string = str()
+    for i in dic.keys():
+        string += (str(i) + " ")
+    return "현재 감시 명단 : %s" % string
+
 
 weekend_string = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
 
@@ -81,7 +87,6 @@ class GSMBot(discord.Client):
 
         self.prefix = "gsm"
         self.color = 0x7ACDF4
-        self.DataManager = DataManager()
         self.commands = [i.split("command_")[-1] for i in list(
             filter(lambda param: param.startswith("command_"), dir(self)))]
 
@@ -120,7 +125,7 @@ class GSMBot(discord.Client):
             # 해당 명령어가 존재하지 않는다면 None을 반환한다.
 
             try:  # 디스코드 닉네임이 인식할 수 없는 문자인 경우에 UnicodeEncodeError가 발생하므로 예외처리
-                today = datetime.today()
+                today = datetime.now()
                 print("[%02d:%02d] %s : %s"
                     % (today.hour, today.minute, message.author, command))
             except UnicodeEncodeError:
@@ -205,11 +210,11 @@ class GSMBot(discord.Client):
         """
         await self.send_typing(message.channel)
 
-        today = self.DataManager.get_nextDay()
+        today = TimeCalculator.get_next_day()
         title = "%s년 %s월 %s일 %s의 %s 식단표" % (today.year, today.month, today.day,
             weekend_string[int(today.weekday())],
-            ["아침", "점심", "저녁"][self.DataManager.get_nextMeal(today) % 3])
-        em = discord.Embed(title=title, description=self.DataManager.get_info(
+            ["아침", "점심", "저녁"][TimeCalculator.get_next_meal_index(today) % 3])
+        em = discord.Embed(title=title, description=DataManager.get_command(
             "hungry"), colour=self.color)
         await self.send_message(message.channel, embed=em)
 
@@ -218,9 +223,9 @@ class GSMBot(discord.Client):
         GSM의 한 달간의 학사일정을 알려줍니다.
         """
         await self.send_typing(message.channel)
-        today = datetime.today()
+        today = datetime.now()
         title = "%s년 %s월의 학사일정" % (today.year, today.month)
-        em = discord.Embed(title=title, description=self.DataManager.get_info(
+        em = discord.Embed(title=title, description=DataManager.get_command(
             "calendar"), colour=self.color)
         await self.send_message(message.channel, embed=em)
 
@@ -424,7 +429,7 @@ class GSMBot(discord.Client):
             pass
 
         print("%s : image %s" % (message.author, keyword))
-        image = self.DataManager.get_info("image", keyword)
+        image = DataManager.get_command("image", keyword)
 
         if image == None:
             em = discord.Embed(title="%s의 이미지 검색 결과" % keyword,
@@ -470,18 +475,12 @@ class GSMBot(discord.Client):
             await self.send_message(message.channel, "올바르지 않은 ID 값이 들어왔습니다.")
             return
 
-        def printDictionary(dic):
-            string = str()
-            for i in dic.keys():
-                string += (str(i) + " ")
-            return "현재 감시 명단 : %s" % string
-
         self.serverCount[user] = 0
 
         if not user in self.peekList.keys():  # 감시 리스트에 user가 없다면
             self.peekList[user] = [message.channel]  # 새로 추가
             await self.send_message(message.channel, "%s의 감시를 시작합니다!" % user.name)
-            print(printDictionary(self.peekList))
+            print(get_peeklist_to_string(self.peekList))
             return
         else:  # 감시 리스트에 user가 있다면
             for i in self.peekList[user]:  # self.peekList[user]은 user의 채널의 리스트
@@ -491,13 +490,13 @@ class GSMBot(discord.Client):
                     else:
                         self.peekList[user].remove(message.channel)
                     await self.send_message(message.channel, "%s의 감시를 취소합니다." % user.name)
-                    print(printDictionary(self.peekList))
+                    print(get_peeklist_to_string(self.peekList))
                     return
 
             # 이미 user가 있지만 새로운 서버에서 peek을 실행했을 때
             self.peekList[user].append(message.channel)
             await self.send_message(message.channel, "%s의 감시를 시작합니다!" % user.name)
-            print(printDictionary(self.peekList))
+            print(get_peeklist_to_string(self.peekList))
             return
 
     @public_only
