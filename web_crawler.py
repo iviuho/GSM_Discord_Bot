@@ -46,9 +46,9 @@ class TimeCalculator:
 
 
 class DataManager:
-    @classmethod
-    def get_command(cls, command, keyword=None):
-        func = getattr(cls, "get_%s" % command, "%s 작업을 처리하는데 문제가 발생했습니다." % command)
+    @staticmethod
+    def get_command(command, keyword=None):
+        func = getattr(DataManager, "get_%s" % command, "%s 작업을 처리하는데 문제가 발생했습니다." % command)
         return func() if keyword == None else func(keyword)
 
     @staticmethod
