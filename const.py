@@ -1,0 +1,15 @@
+class Strings:
+    PRIVATE_SUPPORT = "비공개 채팅에서는 지원하지 않습니다. :("
+    ADMIN_ONLY = "관리자만 사용 가능한 명령어입니다. :("
+    ONLINE = "온라인"
+    OFFLINE = "오프라인"
+    IDLE = "자리비움"
+    DO_NOT_DISTURB = "다른 용무중"
+    PEEK_LIST = "현재 감시 명단"
+    WEEKEND_STRINGS = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+    DEBUGGING = "현재 점검 중"
+    COMMAND_HELP = "도움말 → GSM"
+    NOW_DEBUGGING = "현재 GSM Bot이 점검 중입니다."
+    GSM_LOGO = "http://www.gsm.hs.kr/data_files/skin/skin_high_gsmhs/images/common/logo.png"
+    GSM_BOT_DIE = "GSM Bot이 죽었습니다!"
+    DONT_HAVE_PERMISSION = "Bot에게 메시지 관리 권한이 없습니다."

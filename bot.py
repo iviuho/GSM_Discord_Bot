@@ -9,12 +9,14 @@ import youtube_dl
 from datetime import datetime
 from functools import partial
 
+from const import Strings
 from web_crawler import DataManager, TimeCalculator
+
 
 def public_only(original_func):
     async def wrapper(self, message):
         if isinstance(message.channel, discord.abc.PrivateChannel):
-            await message.channel.send("비공개 채팅에서는 지원하지 않습니다. :(")
+            await message.channel.send(Strings.PRIVATE_SUPPORT)
             return
         else:
             return await original_func(self, message)
@@ -24,8 +26,8 @@ def public_only(original_func):
 
 def admin_only(original_func):
     async def wrapper(self, message):
-        if not message.author.id in self.admin:
-            await message.channel.send("관리자만 사용 가능한 명령어입니다. :(")
+        if message.author.id not in self.admin:
+            await message.channel.send(Strings.ADMIN_ONLY)
             return
         else:
             return await original_func(self, message)
@@ -35,13 +37,13 @@ def admin_only(original_func):
 
 def mapping_state_to_message(status):
     if status == discord.Status.online:
-        return "온라인"
+        return Strings.ONLINE
     elif status == discord.Status.offline:
-        return "오프라인"
+        return Strings.OFFLINE
     elif status == discord.Status.idle:
-        return "자리비움"
+        return Strings.IDLE
     elif status == discord.Status.do_not_disturb:
-        return "다른 용무중"
+        return Strings.DO_NOT_DISTURB
 
 
 def get_nickname(member):
@@ -50,13 +52,14 @@ def get_nickname(member):
     else:
         return member.name
 
+
 def get_peeklist_to_string(dic):
     string = str()
     for i in dic.keys():
         string += (str(i) + " ")
-    return "현재 감시 명단 : %s" % string
+    return "%s : %s" % (Strings.PEEK_LIST, string)
 
-weekend_string = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+weekend_string = Strings.WEEKEND_STRINGS
 
 
 class Timer:
@@ -115,7 +118,7 @@ class GSMBot(discord.Client):
         super().__init__()
 
     async def on_ready(self):
-        activity_name = "현재 점검 중" if self.debug else "도움말 → GSM"
+        activity_name = Strings.DEBUGGING if self.debug else Strings.COMMAND_HELP
         activity = discord.Activity(name=activity_name, type=discord.ActivityType.listening)
         await self.change_presence(activity=activity)
         print("GSM Bot 준비 완료!", end="\n\n")
@@ -131,8 +134,8 @@ class GSMBot(discord.Client):
             if not command.startswith(self.prefix):  # 명령어를 입력한게 아니라면 바로 함수 종료
                 return
 
-            if self.debug and not message.author.id in self.admin:
-                await message.channel.send("현재 GSM Bot이 점검 중입니다.")
+            if self.debug and message.author.id not in self.admin:
+                await message.channel.send(Strings.NOW_DEBUGGING)
                 return
 
             # gsm hungry를 입력했다면, 공백을 기준으로 스플릿한 마지막 결과, 즉 hungry가 command 변수에 들어가게 됨
@@ -158,7 +161,7 @@ class GSMBot(discord.Client):
     async def on_member_update(self, before, after):
         await self.wait_until_ready()
 
-        if not before in self.peekList.keys():  # 감시 리스트에 있지 않으면 바로 리턴
+        if before not in self.peekList.keys():  # 감시 리스트에 있지 않으면 바로 리턴
             return
 
         if not before.roles == after.roles:
@@ -208,8 +211,7 @@ class GSMBot(discord.Client):
         em = discord.Embed(title="**GSM Bot**",
                            description=self.DESCRIPTION_MESSAGE, colour=0x7ACDF4)
         em.add_field(name="**GSM Bot의 명령어**", value=self.commandDocs)
-        em.set_thumbnail(
-            url="http://www.gsm.hs.kr/data_files/skin/skin_high_gsmhs/images/common/logo.png")
+        em.set_thumbnail(url=Strings.GSM_LOGO)
         await message.channel.send(embed=em)
 
     @admin_only
@@ -217,7 +219,7 @@ class GSMBot(discord.Client):
         """
         GSM Bot을 종료시킵니다.
         """
-        await message.channel.send("GSM Bot이 죽었습니다!")
+        await message.channel.send(Strings.GSM_BOT_DIE)
         await self.logout()
 
     async def command_hungry(self, message):
@@ -300,7 +302,7 @@ class GSMBot(discord.Client):
         주제를 정하고 OX 찬반 투표를 생성합니다.
         """
         if not message.channel.permissions_for(message.guild.get_member(self.user.id)).manage_messages:
-            await message.channel.send("Bot에게 메시지 관리 권한이 없습니다.")
+            await message.channel.send(Strings.DONT_HAVE_PERMISSION)
             return
 
         channel_id = message.guild.id
@@ -336,7 +338,7 @@ class GSMBot(discord.Client):
             response = await self.wait_for("message", check=lambda m: message.author == m.author and message.author.dm_channel == m.channel, timeout=float(30))
             # 명령어를 입력한 사용자로부터 답변을 기다린 후, response에 저장해둠
 
-            if response == None:  # 질문에 대해 시간 초과가 일어나면 None이 리턴된다
+            if response is None:  # 질문에 대해 시간 초과가 일어나면 None이 리턴된다
                 await quest.channel.send("%s 투표가 제대로 되지 않았습니다. 다시 시도해주세요." % message.author.mention)
                 return
 
@@ -364,7 +366,7 @@ class GSMBot(discord.Client):
             response = await self.wait_for("message", check=lambda m: message.author == m.author and message.channel == m.channel, timeout=float(30))
             await quest.delete()
 
-            if response == None:
+            if response is None:
                 await message.channel.send("%s 투표가 제대로 시작되지 않았습니다." % message.author.mention)
                 return
 
@@ -439,7 +441,7 @@ class GSMBot(discord.Client):
         except discord.errors.Forbidden:
             pass
 
-        if response == None or response.content.lower() == "cancel":
+        if response is None or response.content.lower() == "cancel":
             await message.channel.send("이미지 검색이 취소되었습니다.")
             return
 
@@ -454,7 +456,7 @@ class GSMBot(discord.Client):
         print("%s : image %s" % (message.author, keyword))
         image = DataManager.get_command("image", keyword)
 
-        if image == None:
+        if image is None:
             em = discord.Embed(title="%s의 이미지 검색 결과" % keyword,
                                description="이미지를 불러올 수 없습니다.", colour=self.color)
         else:
@@ -483,7 +485,7 @@ class GSMBot(discord.Client):
         except discord.errors.Forbidden:
             pass
 
-        if response == None or response.content.lower() == "cancel":
+        if response is None or response.content.lower() == "cancel":
             await message.channel.send("감시가 취소되었습니다.")
             return
 
@@ -560,7 +562,7 @@ class GSMBot(discord.Client):
         except discord.errors.Forbidden:
             pass
 
-        if response == None or response.content.lower() == "cancel":
+        if response is None or response.content.lower() == "cancel":
             await message.channel.send("검색이 취소되었습니다.")
             return
 
@@ -603,6 +605,21 @@ class GSMBot(discord.Client):
                 pass
 
         await message.channel.send("검색을 종료합니다.")
+
+    async def command_source(self, message):
+        """
+        GSM Bot의 Github 링크를 보내드립니다.
+        """
+        link = "https://github.com/IVIuho/GSM_Discord_Bot"
+        em = discord.Embed(title="GSM Bot Source Code", description="받으세요!", url=link, colour=self.color)
+        msg = await message.channel.send(embed=em)
+        await asyncio.sleep(15)
+
+        try:
+            await msg.delete()
+            await message.channel.send("Github 링크는 자동으로 삭제했습니다.")
+        except discord.errors.Forbidden:
+            pass
 
     async def message_log(self, message):
         directory = "./keyword/%s.json" % message.guild.id  # 해당 서버의 고유 아이디마다 json파일을 생성
