@@ -73,12 +73,14 @@ class Timer:
 
 
 class GSMBot(discord.Client):
-    def __init__(self):
+    def __init__(self, *, debug=False):
+        self.debug = debug
+
         if os.path.exists("admin.json"):
             with open("admin.json", "r", encoding="UTF8") as f:
                 # Bot 관리자들의 Discord ID를 admin에 추가함
                 temp = json.load(f)
-                self.admin = [temp[i] for i in temp.keys()]
+                self.admin = tuple([temp[i] for i in temp.keys()])
         else:
             print("[Setup] Created admin.json file")
             with open("admin.json", "w", encoding="UTF8") as f:
@@ -94,8 +96,10 @@ class GSMBot(discord.Client):
 
         self.prefix = "gsm"
         self.color = 0x7ACDF4
-        self.commands = [i.split("command_")[-1] for i in list(
-            filter(lambda param: param.startswith("command_"), dir(self)))]
+        self.commands = tuple([i.split("command_")[-1] for i in list(
+                filter(lambda param: param.startswith("command_"), dir(self))
+            )]
+        )
 
         # GSM Bot의 모든 요소를 불러온 후, command_로 시작하는 함수들만 리스트로 만들어서 출력
         # command_x에서 _를 기준으로 맨 뒤, 즉 x만 msg에 추가한다
@@ -111,7 +115,8 @@ class GSMBot(discord.Client):
         super().__init__()
 
     async def on_ready(self):
-        activity = discord.Activity(name="도움말 → GSM", type=discord.ActivityType.listening)
+        activity_name = "현재 점검 중" if self.debug else "도움말 → GSM"
+        activity = discord.Activity(name=activity_name, type=discord.ActivityType.listening)
         await self.change_presence(activity=activity)
         print("GSM Bot 준비 완료!", end="\n\n")
 
@@ -124,6 +129,10 @@ class GSMBot(discord.Client):
 
             command = message.content.lower()  # 명령어가 대문자로 들어와도 인식할 수 있게 모두 소문자로 변환
             if not command.startswith(self.prefix):  # 명령어를 입력한게 아니라면 바로 함수 종료
+                return
+
+            if self.debug and not message.author.id in self.admin:
+                await message.channel.send("현재 GSM Bot이 점검 중입니다.")
                 return
 
             # gsm hungry를 입력했다면, 공백을 기준으로 스플릿한 마지막 결과, 즉 hungry가 command 변수에 들어가게 됨
@@ -219,9 +228,11 @@ class GSMBot(discord.Client):
         await message.channel.trigger_typing()
 
         today = TimeCalculator.get_next_day()
-        title = "%s년 %s월 %s일 %s의 %s 식단표" % (today.year, today.month, today.day,
+        title = "%s년 %s월 %s일 %s의 %s 식단표" % (
+            today.year, today.month, today.day,
             weekend_string[int(today.weekday())],
-            ["아침", "점심", "저녁"][TimeCalculator.get_next_meal_index(today) % 3])
+            ["아침", "점심", "저녁"][TimeCalculator.get_next_meal_index(today) % 3]
+        )
         em = discord.Embed(title=title, description=DataManager.get_command(
             "hungry"), colour=self.color)
         await message.channel.send(embed=em)
@@ -322,7 +333,7 @@ class GSMBot(discord.Client):
             em.add_field(name="반대 투표", value="X 입력")
             quest = await message.author.send(embed=em)
 
-            response = await self.wait_for("message", check=lambda m: message.author.dm_channel == m.channel, timeout=float(30))
+            response = await self.wait_for("message", check=lambda m: message.author == m.author and message.author.dm_channel == m.channel, timeout=float(30))
             # 명령어를 입력한 사용자로부터 답변을 기다린 후, response에 저장해둠
 
             if response == None:  # 질문에 대해 시간 초과가 일어나면 None이 리턴된다
@@ -496,7 +507,7 @@ class GSMBot(discord.Client):
             return
         else:  # 감시 리스트에 user가 있다면
             for i in self.peekList[user]:  # self.peekList[user]은 user의 채널의 리스트
-                if i.server == message.guild:  # 감시하고 있는 서버에서 다시 한번 입력됐을 때
+                if i.guild == message.guild:  # 감시하고 있는 서버에서 다시 한번 입력됐을 때
                     if len(self.peekList[user]) == 1:
                         del self.peekList[user]
                     else:
@@ -542,7 +553,7 @@ class GSMBot(discord.Client):
         }
 
         quest = await message.channel.send("유튜브 검색을 원하는 키워드를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
-        response = await self.wait_for_message(timeout=float(20), author=message.author, channel=message.channel)
+        response = await self.wait_for("message", check=lambda m: m.author == message.author and m.channel == message.channel, timeout=float(20))
 
         try:
             await quest.delete()
@@ -568,15 +579,24 @@ class GSMBot(discord.Client):
                 len(info["entries"]), info["entries"].index(e) + 1, e["webpage_url"])
             query = await message.channel.send(msg)
             try:
-                await self.add_reaction(query, u"\U0001F44D")
-                await self.add_reaction(query, u"\U0001F44E")
+                await query.add_reaction(u"\U0001F44D")
+                await query.add_reaction(u"\U0001F44E")
             except discord.errors.Forbidden:
                 pass
 
-            response = await self.wait_for_reaction(emoji=[u"\U0001F44D", u"\U0001F44E"], timeout=float(20), user=message.author, message=query)
+            try:
+                response = await self.wait_for(
+                    "reaction_add",
+                    check=lambda re, user: re.emoji in [u"\U0001F44D", u"\U0001F44E"] and
+                        user == message.author and re.message == query,
+                    timeout=float(20)
+                )
 
-            if response == None or response.reaction.emoji == u"\U0001F44D":
+                if response[0].emoji == u"\U0001F44D":
+                    break
+            except asyncio.TimeoutError:
                 break
+
             try:
                 await query.delete()
             except discord.errors.Forbidden:
