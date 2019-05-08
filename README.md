@@ -18,12 +18,9 @@
 2. 이 상태에서, 명령어를 입력해줍니다. `pip install -r requirements.txt`
 3. 다운로드가 완료됐다면 아래와 같은 화면이 나타날 것입니다.
 ![다운로드 완료](https://i.imgur.com/2bBPfJf.png)
-4. GSMBot.py 파일을 Python IDLE로 열어주세요.
-5. 스크롤을 내려 파일의 맨 끝 부분으로 간 뒤,
-`bot.run(here_your_bot_token)`
-괄호 안에 디스코드 봇 어플리케이션의 토큰을 " " 안에 감싸서 넣어주세요.
+4. config 폴더의 config-example.ini 파일에 토큰과 관리자의 디스코드 ID를 넣어 수정하고 config.ini로 저장해주세요.
 
  > 봇 어플리케이션을 생성하는 과정은 [여기](https://blog.naver.com/wpdus2694/221192640522)를 참고해주세요.
   
-6. 파일을 저장한 후, 다시 CMD 창으로 돌아와서, `python GSMBot.py` 를 입력합니다.
-7. 성공적으로 세팅이 됐다면 GSM Bot 준비 완료! 라는 문구가 뜰 것입니다.
+5. 파일을 저장한 후, 다시 CMD 창으로 돌아와서, `python GSMBot.py` 를 입력합니다.
+6. 성공적으로 세팅이 됐다면 GSM Bot 준비 완료! 라는 문구가 뜰 것입니다.
