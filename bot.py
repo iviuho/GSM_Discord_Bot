@@ -5,6 +5,7 @@ import operator
 import os
 import re
 import time
+import warnings
 import youtube_dl
 from datetime import datetime
 from functools import partial
@@ -76,18 +77,9 @@ class Timer:
 
 
 class GSMBot(discord.Client):
-    def __init__(self, *, debug=False):
+    def __init__(self, *, admin, debug=False):
+        self.admin = tuple(admin)
         self.debug = debug
-
-        if os.path.exists("admin.json"):
-            with open("admin.json", "r", encoding="UTF8") as f:
-                # Bot 관리자들의 Discord ID를 admin에 추가함
-                temp = json.load(f)
-                self.admin = tuple([temp[i] for i in temp.keys()])
-        else:
-            print("[Setup] Created admin.json file")
-            with open("admin.json", "w", encoding="UTF8") as f:
-                json.dump({"memo": "here_your_discord_id"}, f, ensure_ascii=False, indent=4)
 
         if not os.path.exists("keyword"):
             print("[Setup] Created keyword directory")
