@@ -78,7 +78,7 @@ class Timer:
 
 class GSMBot(discord.Client):
     def __init__(self, *, admin, debug=False):
-        self.admin = tuple(admin)
+        self.admin = (admin, )
         self.debug = debug
 
         if not os.path.exists("keyword"):
@@ -227,8 +227,11 @@ class GSMBot(discord.Client):
             weekend_string[int(today.weekday())],
             ["아침", "점심", "저녁"][TimeCalculator.get_next_meal_index(today) % 3]
         )
-        em = discord.Embed(title=title, description=DataManager.get_command(
-            "hungry"), colour=self.color)
+        em = discord.Embed(
+            title=title,
+            description=DataManager.get_command("hungry"),
+            colour=self.color
+        )
         await message.channel.send(embed=em)
 
     async def command_calendar(self, message):
@@ -238,8 +241,11 @@ class GSMBot(discord.Client):
         await message.channel.trigger_typing()
         today = datetime.now()
         title = "%s년 %s월의 학사일정" % (today.year, today.month)
-        em = discord.Embed(title=title, description=DataManager.get_command(
-            "calendar"), colour=self.color)
+        em = discord.Embed(
+            title=title,
+            description=DataManager.get_command("calendar"),
+            colour=self.color
+        )
         await message.channel.send(embed=em)
 
     async def command_invite(self, message):
@@ -251,9 +257,15 @@ class GSMBot(discord.Client):
 
         permissions = discord.Permissions(92224)
         link = discord.utils.oauth_url(
-            self.appInfo.id, permissions=permissions)
-        em = discord.Embed(title="☆★☆★GSM Bot 초대 링크★☆★☆",
-            description="받으세요!", url=link, colour=self.color)
+            self.appInfo.id,
+            permissions=permissions
+        )
+        em = discord.Embed(
+            title="☆★☆★GSM Bot 초대 링크★☆★☆",
+            description="받으세요!",
+            url=link,
+            colour=self.color
+        )
         msg = await message.channel.send(embed=em)
         await asyncio.sleep(15)
 
@@ -273,18 +285,18 @@ class GSMBot(discord.Client):
         title = "%s의 입력된 키워드 순위" % message.guild.name
         em = discord.Embed(title=title, colour=self.color)
 
-        with open("./keyword/%s.json" % message.guild.id, "r", encoding="UTF8") as f:
+        with open("keyword/%s.json" % message.guild.id, "r", encoding="UTF8") as f:
             read = json.load(f)
 
         sortedDict = sorted(sorted(read.items(), key=operator.itemgetter(
             0)), key=operator.itemgetter(1), reverse=True)
         # 딕셔너리를 정렬한다. 기준은 value값(입력된 횟수)의 내림차순
 
-        for i in range(0, len(sortedDict)):  # sortedDict의 길이만큼 반복하는데
-            if i >= 10:  # 10위까지만 보여주기 위해서
-                break
-            em.add_field(name="%d위" % (i + 1), value="%s : %d회\n" %
-                         (sortedDict[i][0], sortedDict[i][1]))
+        for i in range(10 if len(sortedDict) > 10 else len(sortedDict)):
+            em.add_field(
+                name="%d위" % (i + 1),
+                value="%s : %d회\n" % (sortedDict[i][0], sortedDict[i][1])
+            )
 
         await message.channel.send(embed=em)
 
@@ -298,7 +310,7 @@ class GSMBot(discord.Client):
             return
 
         channel_id = message.guild.id
-        directory = "./vote/%s.json" % channel_id
+        directory = "vote/%s.json" % channel_id
 
         if os.path.exists(directory):  # 파일이 있다면 이미 투표가 진행되고 있다는 의미
             try:
@@ -307,16 +319,17 @@ class GSMBot(discord.Client):
             except FileNotFoundError:
                 await message.channel.send("%s 투표가 종료돼서 제대로 반영이 되지 않았습니다." % message.author.mention)
 
-            _title = "현재 {}에 대한 투표가 진행중입니다.".format(data["subject"])
-            _desc = "{}, 1:1 채팅을 보냈습니다. 투표는 1:1 채팅에서 진행해주세요.".format(
-                message.author.mention)
+            title = "현재 {}에 대한 투표가 진행중입니다." % data["subject"]
+            desc = "{}, 1:1 채팅을 보냈습니다. 투표는 1:1 채팅에서 진행해주세요." % message.author.mention
             em = discord.Embed(
-                title=_title, description=_desc,
+                title=title,
+                description=desc,
                 colour=self.color
             )
-            em.add_field(name="투표 종료까지", value="{}분 남았습니다.".format(
-                int(((data["start"] + data["time"]) - time.time()) / 60)))
-
+            em.add_field(
+                name="투표 종료까지",
+                value="{}분 남았습니다." % int(data["start"] + data["time"] - time.time()) / 60
+            )
             await message.channel.send(embed=em)
 
             em = discord.Embed(
@@ -458,9 +471,10 @@ class GSMBot(discord.Client):
 
         avatar = message.author.default_avatar_url if message.author.avatar_url == "" else message.author.avatar_url
         # 프로필 사진을 따로 지정해두지 않은 경우에 비어있는 문자열이 반환되므로 이 때는 기본 프로필 사진을 넣어줌
-        em.set_footer(text="%s님이 요청하신 검색 결과" %
-                      message.author.name, icon_url=avatar)
-
+        em.set_footer(
+            text="%s님이 요청하신 검색 결과" % message.author.name,
+            icon_url=avatar
+        )
         await message.channel.send(embed=em)
 
     @public_only
@@ -602,8 +616,12 @@ class GSMBot(discord.Client):
         """
         GSM Bot의 Github 링크를 보내드립니다.
         """
-        link = "https://github.com/IVIuho/GSM_Discord_Bot"
-        em = discord.Embed(title="GSM Bot Source Code", description="받으세요!", url=link, colour=self.color)
+        em = discord.Embed(
+            title="GSM Bot Source Code",
+            description="받으세요!",
+            url=Strings.GITHUB,
+            colour=self.color
+        )
         msg = await message.channel.send(embed=em)
         await asyncio.sleep(15)
 
@@ -614,7 +632,7 @@ class GSMBot(discord.Client):
             pass
 
     async def message_log(self, message):
-        directory = "./keyword/%s.json" % message.guild.id  # 해당 서버의 고유 아이디마다 json파일을 생성
+        directory = "keyword/%s.json" % message.guild.id  # 해당 서버의 고유 아이디마다 json파일을 생성
 
         if os.path.exists(directory):  # 파일이 이미 존재한다면
             with open(directory, "r", encoding="UTF8") as f:

@@ -13,3 +13,4 @@ class Strings:
     GSM_LOGO = "http://www.gsm.hs.kr/data_files/skin/skin_high_gsmhs/images/common/logo.png"
     GSM_BOT_DIE = "GSM Bot이 죽었습니다!"
     DONT_HAVE_PERMISSION = "Bot에게 메시지 관리 권한이 없습니다."
+    GITHUB = "https://github.com/IVIuho/GSM_Discord_Bot"

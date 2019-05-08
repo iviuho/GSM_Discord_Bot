@@ -42,10 +42,14 @@ class TimeCalculator:
     def get_next_day():
         today = datetime.datetime.today()
         return today + datetime.timedelta(
-            int(TimeCalculator.get_next_meal_index(today) / 3))
+            int(TimeCalculator.get_next_meal_index(today) / 3)
+        )
 
 
 class DataManager:
+    recent_meal = {}
+    recent_calendar = {}
+
     @staticmethod
     def get_command(command, keyword=None):
         func = getattr(DataManager, "get_%s" % command, "%s 작업을 처리하는데 문제가 발생했습니다." % command)
@@ -55,6 +59,14 @@ class DataManager:
     def get_hungry():
         today = TimeCalculator.get_next_day()
         next_meal = TimeCalculator.get_next_meal_index(today)
+
+        try:
+            this_meal = DataManager.recent_meal[today.date()][next_meal]
+            if this_meal:
+                return this_meal
+        except KeyError:
+            DataManager.recent_meal = {today.date(): {i: "" for i in range(3)}}
+
         item = ["아침", "점심", "저녁"]
 
         soup = HTMLGetter("http://www.gsm.hs.kr/xboard/board.php?tbnum=8&sYear=%s&sMonth=%s"
@@ -72,6 +84,7 @@ class DataManager:
             if not len(result):
                 raise Exception
 
+            DataManager.recent_meal[today.date()][next_meal] = result
             return result
         except:
             print("[오류] GSM Bot이 식단표를 받아올 수 없습니다.")
@@ -81,6 +94,13 @@ class DataManager:
     def get_calendar():
         today = datetime.datetime.today()
 
+        try:
+            this_calendar = DataManager.recent_calendar[today.month]
+            if this_calendar:
+                return this_calendar
+        except KeyError:
+            DataManager.recent_calendar = {today.month: ""}
+
         soup = HTMLGetter("http://www.gsm.hs.kr/xboard/board.php?tbnum=4").get_soup()
 
         try:
@@ -88,15 +108,14 @@ class DataManager:
 
             result = "```"
             for i in info:
-                if not i.find("dd") == None:
-                    text = i.text.replace("\n", "")
-                    data = text.split("- ")
-
+                if i.find("dd") is not None:
+                    data = i.text.replace("\n", "").split("- ")
                     result += "%6s - %s\n" % (data[0], data[1])
                     for i in data[2:]:
                         result += "%7s - %s\n" % ("", i)
             result += "```"
 
+            DataManager.recent_calendar[today.month] = result
             return result
         except AttributeError:
             print("[오류] GSM Bot이 학사일정을 불러올 수 없습니다.")
