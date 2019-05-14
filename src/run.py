@@ -3,7 +3,7 @@ from os.path import dirname, exists, join
 
 from bot import GSMBot, Timer
 
-CONFIG_FILE = join(dirname(__file__), "config/config.ini")
+CONFIG_FILE = join("..", "config", "config.ini")
 
 if exists(CONFIG_FILE):
     parser = configparser.ConfigParser()

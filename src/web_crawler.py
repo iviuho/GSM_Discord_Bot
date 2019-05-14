@@ -4,6 +4,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
+
 class HTMLGetter:
     def __init__(self, url):
         self.url = url
@@ -32,7 +33,7 @@ class TimeCalculator:
         # 8시 0분, 13시 30분, 19시 30분
         # 각각 식사 시간이 끝나는 시각(분 단위로 환산함)
         meal_time = [480, 810, 1170]
-        
+
         for i in range(len(meal_time)):
             if (now.hour * 60 + now.minute) < meal_time[i]:
                 return i
@@ -53,7 +54,7 @@ class DataManager:
     @staticmethod
     def get_command(command, keyword=None):
         func = getattr(DataManager, "get_%s" % command, "%s 작업을 처리하는데 문제가 발생했습니다." % command)
-        return func() if keyword == None else func(keyword)
+        return func() if keyword is None else func(keyword)
 
     @staticmethod
     def get_hungry():
@@ -70,11 +71,11 @@ class DataManager:
         item = ["아침", "점심", "저녁"]
 
         soup = HTMLGetter("http://www.gsm.hs.kr/xboard/board.php?tbnum=8&sYear=%s&sMonth=%s"
-            % (today.year, today.month)).get_soup()
+        % (today.year, today.month)).get_soup()
 
         try:
             info = soup.select("#xb_fm_list > div.calendar > ul > li > div > div.slider_food_list.slider_food%s.cycle-slideshow" % today.day)
-            menuList = (info[0].find("div", {"data-cycle-pager-template" : "<a href=#none; class=today_food_on%s title=%s></a>"
+            menuList = (info[0].find("div", {"data-cycle-pager-template": "<a href=#none; class=today_food_on%s title=%s></a>"
                 % (next_meal % 3 + 1, item[next_meal % 3])}).find("span", "content").text).split("\n")
 
             p = re.compile("(?!에너지)[가-힣&\\s]+") # 영양성분 문장을 제외하기 위한 정규표현식
@@ -123,13 +124,14 @@ class DataManager:
 
     @staticmethod
     def get_image(keyword):
-        soup = HTMLGetter("https://www.google.co.kr/search?hl=en&tbm=isch&q=%s"
-            % keyword).get_soup()
+        soup = HTMLGetter("https://www.google.co.kr/search?hl=en&tbm=isch&q=%s" % keyword).get_soup()
 
         try:
             info = soup.find_all("img")
-            index = random.randint(1, len(info)) # 구글 자체 이미지가 포함되어 있기 때문에 1부터 시작한다
-            return info[index]["src"] # 이미지의 링크를 가져옴
+            # 구글 자체 이미지가 포함되어 있기 때문에 1부터 시작한다
+            index = random.randint(1, len(info))
+            # 이미지의 링크를 가져옴
+            return info[index]["src"]
         except:
             print("[오류] GSM Bot이 이미지를 가져올 수 없습니다.")
             return None

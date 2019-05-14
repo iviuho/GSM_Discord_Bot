@@ -81,11 +81,11 @@ class GSMBot(discord.Client):
         self.admin = (admin, )
         self.debug = debug
 
-        if not os.path.exists("keyword"):
+        if not os.path.exists(os.path.join("..", "keyword")):
             print("[Setup] Created keyword directory")
             os.makedirs("keyword")
 
-        if not os.path.exists("vote"):
+        if not os.path.exists(os.path.join("..", "vote")):
             print("[Setup] Created vote directory")
             os.makedirs("vote")
 
@@ -285,7 +285,8 @@ class GSMBot(discord.Client):
         title = "%s의 입력된 키워드 순위" % message.guild.name
         em = discord.Embed(title=title, colour=self.color)
 
-        with open("keyword/%s.json" % message.guild.id, "r", encoding="UTF8") as f:
+        KEYWORD = os.path.join("..", "keyword", "%s.json" % message.guild.id)
+        with open(KEYWORD, "r", encoding="UTF8") as f:
             read = json.load(f)
 
         sortedDict = sorted(sorted(read.items(), key=operator.itemgetter(
@@ -310,7 +311,7 @@ class GSMBot(discord.Client):
             return
 
         channel_id = message.guild.id
-        directory = "vote/%s.json" % channel_id
+        directory = os.path.join("..", "vote", "%s.json" % channel_id)
 
         if os.path.exists(directory):  # 파일이 있다면 이미 투표가 진행되고 있다는 의미
             try:
@@ -318,9 +319,10 @@ class GSMBot(discord.Client):
                     data = json.load(f)
             except FileNotFoundError:
                 await message.channel.send("%s 투표가 종료돼서 제대로 반영이 되지 않았습니다." % message.author.mention)
+                return
 
-            title = "현재 {}에 대한 투표가 진행중입니다." % data["subject"]
-            desc = "{}, 1:1 채팅을 보냈습니다. 투표는 1:1 채팅에서 진행해주세요." % message.author.mention
+            title = "현재 %s에 대한 투표가 진행중입니다." % data["subject"]
+            desc = "%s, 1:1 채팅을 보냈습니다. 투표는 1:1 채팅에서 진행해주세요." % message.author.mention
             em = discord.Embed(
                 title=title,
                 description=desc,
@@ -328,7 +330,7 @@ class GSMBot(discord.Client):
             )
             em.add_field(
                 name="투표 종료까지",
-                value="{}분 남았습니다." % int(data["start"] + data["time"] - time.time()) / 60
+                value="%s분 남았습니다." % int((data["start"] + data["time"] - time.time()) / 60)
             )
             await message.channel.send(embed=em)
 
@@ -632,7 +634,8 @@ class GSMBot(discord.Client):
             pass
 
     async def message_log(self, message):
-        directory = "keyword/%s.json" % message.guild.id  # 해당 서버의 고유 아이디마다 json파일을 생성
+        # 해당 서버의 고유 아이디마다 json파일을 생성
+        directory = os.path.join("..", "keyword", "%s.json" % message.guild.id)
 
         if os.path.exists(directory):  # 파일이 이미 존재한다면
             with open(directory, "r", encoding="UTF8") as f:
