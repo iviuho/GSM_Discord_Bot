@@ -5,7 +5,6 @@ import operator
 import os
 import re
 import time
-import warnings
 import youtube_dl
 from datetime import datetime
 from functools import partial
@@ -562,10 +561,9 @@ class GSMBot(discord.Client):
             "no_warnings": True
         }
 
-        quest = await message.channel.send("유튜브 검색을 원하는 키워드를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
-        response = await self.wait_for("message", check=lambda m: m.author == message.author and m.channel == message.channel, timeout=float(20))
-
         try:
+            quest = await message.channel.send("유튜브 검색을 원하는 키워드를 입력해주세요. 앞에 GSM은 붙이지 않습니다.\n취소하시려면 Cancel을 입력해주세요.")
+            response = await self.wait_for("message", check=lambda m: m.author == message.author and m.channel == message.channel, timeout=float(20))
             await quest.delete()
         except discord.errors.Forbidden:
             pass
@@ -598,7 +596,7 @@ class GSMBot(discord.Client):
                 response = await self.wait_for(
                     "reaction_add",
                     check=lambda re, user: re.emoji in [u"\U0001F44D", u"\U0001F44E"] and
-                        user == message.author and re.message == query,
+                         user == message.author,
                     timeout=float(20)
                 )
 
