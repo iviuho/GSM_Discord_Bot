@@ -4,6 +4,9 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
+from kr_school_meal_parser.menu_parser import MenuParser
+from kr_school_meal_parser.school import School
+
 
 class HTMLGetter:
     def __init__(self, url):
@@ -48,8 +51,11 @@ class TimeCalculator:
 
 
 class DataManager:
+    gsm = School(School.Region.GWANGJU, School.Type.HIGH, "F100000120")
+    parser = MenuParser(gsm)
     recent_meal = {}
     recent_calendar = {}
+    item = ["아침", "점심", "저녁"]
 
     @staticmethod
     def get_command(command, keyword=None):
@@ -68,28 +74,19 @@ class DataManager:
         except KeyError:
             DataManager.recent_meal = {today.date(): {i: "" for i in range(3)}}
 
-        item = ["아침", "점심", "저녁"]
-
-        soup = HTMLGetter("http://www.gsm.hs.kr/xboard/board.php?tbnum=8&sYear=%s&sMonth=%s"
-        % (today.year, today.month)).get_soup()
-
         try:
-            info = soup.select("#xb_fm_list > div.calendar > ul > li > div > div.slider_food_list.slider_food%s.cycle-slideshow" % today.day)
-            menuList = (info[0].find("div", {"data-cycle-pager-template": "<a href=#none; class=today_food_on%s title=%s></a>"
-                % (next_meal % 3 + 1, item[next_meal % 3])}).find("span", "content").text).split("\n")
-
-            p = re.compile("(?!에너지)[가-힣&\\s]+") # 영양성분 문장을 제외하기 위한 정규표현식
-            result = "".join("- %s\n" % p.match(i).group() for i in menuList if p.match(i))
-
-            # result의 길이가 0이면
+            menus = DataManager.parser.get_menu()
+            result = "\n".join("- %s" % item for item in menus.menu[today.day]
+                [["breakfast", "lunch", "dinner"][next_meal % 3]])
+            
             if not len(result):
                 raise Exception
 
-            DataManager.recent_meal[today.date()][next_meal] = result
+            DataManager.recent_meal[today.date()][next_meal % 3] = result
             return result
         except:
             print("[오류] GSM Bot이 식단표를 받아올 수 없습니다.")
-            return "%s 급식을 불러올 수 없습니다." % item[next_meal % 3]
+            return "%s 급식을 불러올 수 없습니다." % DataManager.item[next_meal % 3]
 
     @staticmethod
     def get_calendar():
