@@ -35,7 +35,7 @@ def save_to_json(result, name="result.json"):
     result: dict
     저장하고자 하는 데이터
     """
-    logger.info(f"Started saving json file as {name}.")
+    logger.info("Started saving json file as {}.".format(name))
 
     try:
         with open(name, "w", encoding="UTF-8") as f:
@@ -85,12 +85,12 @@ class MenuParser:
     def __create_url(self, year, month):
         today = datetime.date(year, month, 1)
 
-        url = f"https://{self.school.region}/sts_sci_md00_001.do?"
-        url += f"schulCode={self.school.code}&"
-        url += f"schulCrseScCode={self.school.type}&"
-        url += f"schulKndScCode={self.school.type:02d}&"
-        url += f"ay={today.year}&"
-        url += f"mm={today.month:02d}"
+        url = "https://{}/sts_sci_md00_001.do?".format(self.school.region)
+        url += "schulCode={}&".format(self.school.code)
+        url += "schulCrseScCode={}&".format(self.school.type)
+        url += "schulKndScCode={:02d}&".format(self.school.type)
+        url += "ay={}&".format(today.year)
+        url += "mm={:02d}".format(today.month)
 
         return url
 
